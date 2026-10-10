@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-stone-50 text-stone-800;
+  }
+}
+
+@layer utilities {
+  .leaflet-container {
+    height: 100%;
+    width: 100%;
+    z-index: 0;
+  }
+}
