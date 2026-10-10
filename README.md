@@ -1,0 +1,1 @@
+MilChoix Sénégal est un projet de plateforme d'information, de cartographie et d'aide au choix variétal du mil. Elle aide producteurs, organisations paysannes et conseillers agricoles à identifier les variétés potentiellement les mieux adaptées à leur localité et à la campagne agricole.
