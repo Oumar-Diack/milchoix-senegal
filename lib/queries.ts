@@ -2,6 +2,7 @@ import { ensureDatabase } from "./ensure-db";
 import { getDb } from "./db";
 import type { Variety, Commune, Climat, Preferences } from "./types";
 import { scoreVariety, sortResults, type VarietyResult } from "./recommendation";
+import { pluvioAnnuelle } from "./isohyetes";
 
 function db() {
   ensureDatabase();
@@ -130,13 +131,15 @@ export interface RecommendationRecord {
 export function computeRecommendations(
   communeId: number,
   prefs: Preferences
-): { results: VarietyResult[]; climat: Climat | null } {
+): { results: VarietyResult[]; climat: Climat | null; pluvioAnnuelle: number | null } {
   const climat = getClimat(communeId, prefs.campagneAnnee);
+  const commune = getCommune(communeId);
+  const pluvio = commune ? pluvioAnnuelle(commune.latitude, commune.longitude) : null;
   const varieties = getVarieties();
   const results = varieties
-    .map((v) => scoreVariety(v, climat, prefs))
+    .map((v) => scoreVariety(v, climat, prefs, pluvio))
     .filter((r) => r.variety.statut !== "en_evaluation" || r.classification !== "non_recommandee");
-  return { results: sortResults(results), climat };
+  return { results: sortResults(results), climat, pluvioAnnuelle: pluvio };
 }
 
 export function saveRecommendation(

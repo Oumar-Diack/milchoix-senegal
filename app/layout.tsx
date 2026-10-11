@@ -56,7 +56,7 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
         <ChatWidget />
         <footer className="bg-stone-900 text-stone-300 text-sm">
-          <div className="mx-auto max-w-6xl px-4 py-8 grid gap-4 sm:grid-cols-3">
+          <div className="mx-auto max-w-6xl px-4 py-8 grid gap-4 sm:grid-cols-2">
             <div>
               <p className="font-semibold text-white">MilChoix Sénégal</p>
               <p className="mt-1 text-xs">
@@ -69,13 +69,6 @@ export default function RootLayout({
                 Les recommandations sont une aide à la décision et ne remplacent
                 ni l'expérience des producteurs ni l'avis des conseillers
                 agricoles.
-              </p>
-            </div>
-            <div className="text-xs">
-              <p className="font-semibold text-white mb-1">Données d'exemple</p>
-              <p>
-                Cette version de démonstration utilise des données fictives
-                réalistes à des fins de test.
               </p>
             </div>
           </div>

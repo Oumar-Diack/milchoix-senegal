@@ -21,7 +21,7 @@ export default async function CartePage({
       <h1 className="text-3xl font-bold text-mil-900">Carte variétale intelligente</h1>
       <p className="mt-2 text-stone-600">
         Visualisez les zones d'adaptation (officielles, historiques, potentielles) et
-        les données climatiques par localité. Cliquez sur une localité pour plus de détails.
+        les données climatiques par région. Cliquez sur une région pour plus de détails.
       </p>
 
       <VarietyMap

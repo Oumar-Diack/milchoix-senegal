@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getRecommendation, getCommune, getClimat } from "@/lib/queries";
 import { CLASSIFICATION_LABELS, type Classification } from "@/lib/recommendation";
+import { pluvioAnnuelle } from "@/lib/isohyetes";
 import { FeedbackForm } from "@/components/FeedbackForm";
 
 interface ResultItem {
@@ -14,6 +15,7 @@ interface ResultItem {
   duree_cycle_jours: number | null;
   besoins_pluvio_min_mm: number | null;
   besoins_pluvio_max_mm: number | null;
+  besoins_pluvio_estimes?: boolean;
   tolerance_secheresse: string;
   disponibilite_semences: string;
   rendement_observe_moyen_kg: number | null;
@@ -48,6 +50,7 @@ export default async function RecommendationPage({
 
   const commune = getCommune(rec.commune_id);
   const climat = getClimat(rec.commune_id, rec.campagne_annee);
+  const pluvio = commune ? pluvioAnnuelle(commune.latitude, commune.longitude) : null;
   const results: ResultItem[] = JSON.parse(rec.resultats);
 
   return (
@@ -94,10 +97,17 @@ export default async function RecommendationPage({
           </div>
         </div>
       ) : (
-        <p className="mt-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm">
-          Données climatiques non disponibles pour cette campagne : les résultats reposent
-          sur un nombre réduit de critères et la confiance est abaissée.
-        </p>
+        <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm">
+          <p>
+            Données climatiques non disponibles pour cette campagne : les résultats reposent
+            sur un nombre réduit de critères et la confiance est abaissée.
+          </p>
+          {pluvio != null && (
+            <p className="mt-1 font-medium">
+              Pluviométrie annuelle moyenne estimée (isohyètes) : {Math.round(pluvio)} mm.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="mt-6 space-y-5">
@@ -166,7 +176,7 @@ export default async function RecommendationPage({
                     <dt className="text-stone-400 text-xs">Besoins en eau</dt>
                     <dd>
                       {r.besoins_pluvio_min_mm != null
-                        ? `${r.besoins_pluvio_min_mm}–${r.besoins_pluvio_max_mm} mm`
+                        ? `${r.besoins_pluvio_min_mm}–${r.besoins_pluvio_max_mm} mm${r.besoins_pluvio_estimes ? " (estimés)" : ""}`
                         : "—"}
                     </dd>
                   </div>

@@ -14,7 +14,7 @@ export function RecommendationForm({
 }) {
   const router = useRouter();
   const [communeId, setCommuneId] = useState<string>("");
-  const [campagneAnnee, setCampagneAnnee] = useState<string>(String(years[0] ?? new Date().getFullYear()));
+  const [campagneAnnee, setCampagneAnnee] = useState<string>(String(new Date().getFullYear()));
   const [dateSemis, setDateSemis] = useState<string>("");
   const [typeSol, setTypeSol] = useState<string>("");
   const [dureeCycleSouhaitee, setDureeCycleSouhaitee] = useState<string>("");
@@ -89,18 +89,22 @@ export function RecommendationForm({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Campagne agricole *</label>
-            <select
+            <input
+              type="number"
+              min={2000}
+              max={2100}
+              step={1}
               value={campagneAnnee}
               onChange={(e) => setCampagneAnnee(e.target.value)}
               className={inputCls}
               required
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+              placeholder="Ex. 2026"
+            />
+            {years.length > 0 && (
+              <p className="text-xs text-stone-400">
+                Années avec données climatiques : {years.join(", ")}.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Date prévisionnelle de semis</label>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeRecommendations, saveRecommendation, getCommune } from "@/lib/queries";
+import { besoinsPluvio } from "@/lib/recommendation";
 import type { Preferences } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -38,25 +39,29 @@ export async function POST(req: NextRequest) {
 
   const { results, climat } = computeRecommendations(communeId, prefs);
 
-  const resultatsPayload = results.map((r) => ({
-    variety_id: r.variety.id,
-    nom_officiel: r.variety.nom_officiel,
-    noms_locaux: r.variety.noms_locaux,
-    statut: r.variety.statut,
-    statut_validation: r.variety.statut_validation,
-    precocite: r.variety.precocite,
-    duree_cycle_jours: r.variety.duree_cycle_jours,
-    besoins_pluvio_min_mm: r.variety.besoins_pluvio_min_mm,
-    besoins_pluvio_max_mm: r.variety.besoins_pluvio_max_mm,
-    tolerance_secheresse: r.variety.tolerance_secheresse,
-    disponibilite_semences: r.variety.disponibilite_semences,
-    rendement_observe_moyen_kg: r.variety.rendement_observe_moyen_kg,
-    score: r.score,
-    classification: r.classification,
-    raisons: r.raisons,
-    confiance: r.confiance,
-    confiance_raison: r.confiance_raison,
-  }));
+  const resultatsPayload = results.map((r) => {
+    const besoins = besoinsPluvio(r.variety);
+    return {
+      variety_id: r.variety.id,
+      nom_officiel: r.variety.nom_officiel,
+      noms_locaux: r.variety.noms_locaux,
+      statut: r.variety.statut,
+      statut_validation: r.variety.statut_validation,
+      precocite: r.variety.precocite,
+      duree_cycle_jours: r.variety.duree_cycle_jours,
+      besoins_pluvio_min_mm: besoins?.min ?? r.variety.besoins_pluvio_min_mm,
+      besoins_pluvio_max_mm: besoins?.max ?? r.variety.besoins_pluvio_max_mm,
+      besoins_pluvio_estimes: besoins?.estime ?? false,
+      tolerance_secheresse: r.variety.tolerance_secheresse,
+      disponibilite_semences: r.variety.disponibilite_semences,
+      rendement_observe_moyen_kg: r.variety.rendement_observe_moyen_kg,
+      score: r.score,
+      classification: r.classification,
+      raisons: r.raisons,
+      confiance: r.confiance,
+      confiance_raison: r.confiance_raison,
+    };
+  });
 
   const id = saveRecommendation(
     String(body.sessionId ?? crypto.randomUUID()),

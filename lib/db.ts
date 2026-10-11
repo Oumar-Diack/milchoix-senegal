@@ -111,6 +111,14 @@ export function createSchema(db: DatabaseSync): void {
       UNIQUE (commune_id, annee)
     );
 
+    CREATE TABLE IF NOT EXISTS isohyetes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      contour_mm INTEGER NOT NULL,
+      geometry TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT '',
+      date_maj TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS recommendations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT NOT NULL,

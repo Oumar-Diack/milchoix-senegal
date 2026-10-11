@@ -11,6 +11,15 @@ export async function GET() {
   return NextResponse.json({
     varieties: db.prepare("SELECT * FROM varieties ORDER BY id DESC").all(),
     communes: db.prepare("SELECT * FROM communes ORDER BY nom").all(),
+    zones: db
+      .prepare(
+        `SELECT vz.*, v.nom_officiel, c.nom AS commune_nom, c.departement, c.region
+         FROM variety_zones vz
+         JOIN varieties v ON v.id = vz.variety_id
+         JOIN communes c ON c.id = vz.commune_id
+         ORDER BY v.nom_officiel, c.nom`
+      )
+      .all(),
     climat: db
       .prepare(
         `SELECT cl.*, c.nom AS commune_nom FROM climat cl JOIN communes c ON c.id = cl.commune_id ORDER BY cl.annee DESC, c.nom`

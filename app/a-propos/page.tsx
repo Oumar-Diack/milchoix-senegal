@@ -18,7 +18,7 @@ export default function AProposPage() {
       </p>
       <ol className="mt-4 space-y-3 text-stone-700">
         <li className="flex gap-3">
-          <span className="text-mil-600 font-bold">Phase 1.</span>
+          <span className="text-mil-600 font-bold shrink-0 whitespace-nowrap">Phase 1.</span>
           <span>
             Des <strong>règles agronomiques explicites</strong> : compatibilité du
             cycle avec la durée probable de la saison, besoins pluviométriques face
@@ -28,7 +28,7 @@ export default function AProposPage() {
           </span>
         </li>
         <li className="flex gap-3">
-          <span className="text-mil-600 font-bold">Phase 2.</span>
+          <span className="text-mil-600 font-bold shrink-0 whitespace-nowrap">Phase 2.</span>
           <span>
             Un <strong>système multicritère</strong> combinant plusieurs dimensions
             pondérées, validé par des spécialistes et ajusté à la lumière des
@@ -36,7 +36,7 @@ export default function AProposPage() {
           </span>
         </li>
         <li className="flex gap-3">
-          <span className="text-mil-600 font-bold">Phase 3.</span>
+          <span className="text-mil-600 font-bold shrink-0 whitespace-nowrap">Phase 3.</span>
           <span>
             L'<strong>apprentissage automatique</strong>, envisagé ultérieurement
             lorsque des données de terrain suffisamment fiables et géolocalisées
@@ -77,14 +77,39 @@ export default function AProposPage() {
         </li>
       </ul>
 
-      <div className="mt-10 rounded-xl bg-amber-50 border border-amber-200 p-5 text-sm text-amber-800">
-        <p className="font-semibold">Avertissement important</p>
-        <p className="mt-1">
-          Cette version de démonstration utilise des données fictives réalistes à des
-          fins de test. Les recommandations ne constituent pas une garantie de
-          résultat et doivent toujours être examinées en tenant compte des conditions
-          réelles de la parcelle et des conseils des professionnels compétents.
-        </p>
+      <h2 className="mt-10 text-xl font-bold text-mil-900">Contact</h2>
+      <div className="mt-4 rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-semibold text-stone-400">Responsable de la plateforme</p>
+        <p className="mt-2 text-lg font-bold text-mil-900">Dr Oumar Diack</p>
+        <dl className="mt-3 space-y-1.5 text-sm text-stone-700">
+          <div>
+            <dt className="text-stone-400 text-xs">Fonction</dt>
+            <dd>Chercheur en Génétique et amélioration du Mil</dd>
+          </div>
+          <div>
+            <dt className="text-stone-400 text-xs">Institution</dt>
+            <dd>
+              Centre National de Recherches Agronomiques (CNRA), Institut Sénégalais de
+              Recherche Agricole (ISRA)
+            </dd>
+          </div>
+          <div>
+            <dt className="text-stone-400 text-xs">E-mail</dt>
+            <dd>
+              <a href="mailto:oumar.diack@isra.sn" className="text-mil-700 hover:underline">
+                oumar.diack@isra.sn
+              </a>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-stone-400 text-xs">Téléphone</dt>
+            <dd>
+              <a href="tel:+221771139031" className="text-mil-700 hover:underline">
+                +221 77 113 90 31
+              </a>
+            </dd>
+          </div>
+        </dl>
       </div>
     </div>
   );

@@ -46,18 +46,94 @@ function semisEstTardif(dateSemis: string | null): boolean {
   return d.getMonth() > 6 || (d.getMonth() === 6 && d.getDate() >= 10); // après le 10 juillet
 }
 
-function toleranceLevel(tolerance: string): number {
-  const t = tolerance.toLowerCase();
-  if (t.includes("très") || t.includes("tres")) return 3;
-  if (t.includes("bonne")) return 2;
+function toleranceLevel(variety: Variety): number {
+  const t = `${variety.tolerance_secheresse} ${variety.description}`.toLowerCase();
+  if (t.includes("stay-green")) return 3;
+  if (
+    t.includes("sécheresse terminale") ||
+    t.includes("secheresse terminale") ||
+    t.includes("très tolérante") ||
+    t.includes("tres tolérante") ||
+    t.includes("très bonne") ||
+    t.includes("tres bonne")
+  )
+    return 3;
+  if (t.includes("tolérante") || t.includes("tolerante") || t.includes("bonne")) return 2;
   if (t.includes("moyenne")) return 1;
   return 0;
+}
+
+// Parse une chaîne "Maladie : niveau ; Maladie : niveau" du catalogue en dictionnaire.
+function parseResistances(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!text) return out;
+  for (const part of text.split(";")) {
+    const idx = part.indexOf(":");
+    if (idx < 0) continue;
+    const key = part.slice(0, idx).trim().toLowerCase();
+    const val = part.slice(idx + 1).trim().toLowerCase();
+    if (key && val) out[key] = val;
+  }
+  return out;
+}
+
+// Convertit un niveau (résistance/sensibilité) du catalogue en score signé.
+function resistanceScore(niveau: string): number {
+  const v = (niveau ?? "").toLowerCase();
+  if (v.includes("absente") || v.includes("résistante") || v.includes("resistante")) return 3;
+  if (v.includes("sensible") || v.includes("sensibilité") || v.includes("sensibilite")) return -3;
+  if (v.includes("présente") || v.includes("presente")) return -2;
+  if (
+    v.includes("tolérante") ||
+    v.includes("tolerante") ||
+    v.includes("très faible") ||
+    v.includes("tres faible") ||
+    v.includes("moins de")
+  )
+    return 2;
+  if (v.includes("faible")) return 1;
+  if (v.includes("moyen")) return 0;
+  return 0;
+}
+
+export interface BesoinsPluvio {
+  min: number;
+  max: number;
+  estime: boolean;
+}
+
+// Besoins pluviométriques : valeur du catalogue si renseignée, sinon
+// estimation agronomique à partir de la précocité (le mil à chandelle exige
+// ~300 mm en zone très précoce jusqu'à ~800 mm en zone tardive).
+export function besoinsPluvio(variety: Variety): BesoinsPluvio | null {
+  if (variety.besoins_pluvio_min_mm != null && variety.besoins_pluvio_max_mm != null) {
+    return {
+      min: variety.besoins_pluvio_min_mm,
+      max: variety.besoins_pluvio_max_mm,
+      estime: false,
+    };
+  }
+  const p = (variety.precocite ?? "").toLowerCase();
+  if (p.includes("très précoce") || p.includes("tres precoce")) {
+    return { min: 300, max: 550, estime: true };
+  }
+  if (p.includes("semi")) {
+    return { min: 400, max: 700, estime: true };
+  }
+  if (p.includes("précoce") || p.includes("precoce")) {
+    return { min: 350, max: 600, estime: true };
+  }
+  if (p.includes("tardif")) {
+    return { min: 500, max: 800, estime: true };
+  }
+  return null;
 }
 
 export function scoreVariety(
   variety: Variety,
   climat: Climat | null,
-  prefs: Preferences
+  prefs: Preferences,
+  pluvioAnnuelle: number | null = null
 ): VarietyResult {
   const raisons: Reason[] = [];
   let score = 55;
@@ -68,6 +144,11 @@ export function scoreVariety(
   const cumul = climat?.cumul_pluvio_mm ?? null;
   const nbSec = climat?.nb_sequences_seches ?? null;
   const dureeMaxSec = climat?.duree_max_seche_jours ?? null;
+  const pluvio = cumul ?? pluvioAnnuelle;
+  const pluvioSource =
+    cumul != null ? "cumul prévu" : "pluviométrie annuelle moyenne (isohyètes)";
+  const resistances = parseResistances(variety.resistances_maladies);
+  const tol = toleranceLevel(variety);
 
   // 1. Durée de cycle vs saison
   if (cycle != null && dureeSaison != null) {
@@ -114,38 +195,56 @@ export function scoreVariety(
   }
 
   // 2. Besoins pluviométriques
-  if (exclusion == null && variety.besoins_pluvio_min_mm != null && variety.besoins_pluvio_max_mm != null && cumul != null) {
-    const min = variety.besoins_pluvio_min_mm;
-    const max = variety.besoins_pluvio_max_mm;
-    if (cumul >= min && cumul <= max + 100) {
+  const besoins = besoinsPluvio(variety);
+  if (exclusion == null && besoins != null && pluvio != null) {
+    const { min, max, estime } = besoins;
+    const note = estime ? " (estimés d'après la précocité)" : "";
+    if (pluvio >= min && pluvio <= max + 100) {
       score += 20;
       raisons.push({
         critere: "Pluviométrie",
-        message: `Besoins en eau (${min}–${max} mm) couverts par le cumul prévu (${cumul} mm).`,
+        message: `Besoins en eau${note} (${min}–${max} mm) couverts par le ${pluvioSource} (${pluvio} mm).`,
         type: "positif",
       });
-    } else if (cumul < min) {
+    } else if (pluvio < min) {
       score -= 20;
       raisons.push({
         critere: "Pluviométrie",
-        message: `Cumul prévu (${cumul} mm) inférieur aux besoins minimaux (${min} mm).`,
+        message: `${pluvioSource} (${pluvio} mm) inférieur aux besoins minimaux${note} (${min} mm).`,
         type: "negatif",
       });
     } else {
-      score -= 8;
-      raisons.push({
-        critere: "Pluviométrie",
-        message: `Cumul prévu (${cumul} mm) supérieur aux besoins (${max} mm) : risque d'excès d'eau (mildiou).`,
-        type: "negatif",
-      });
+      const mildiou = resistanceScore(resistances.mildiou ?? "");
+      if (mildiou >= 2) {
+        score -= 2;
+        raisons.push({
+          critere: "Pluviométrie",
+          message: `${pluvioSource} (${pluvio} mm) supérieur aux besoins${note} (${max} mm) : excès d'eau, atténué par la résistance au mildiou de la variété.`,
+          type: "negatif",
+        });
+      } else if (mildiou <= -2) {
+        score -= 14;
+        raisons.push({
+          critere: "Pluviométrie",
+          message: `${pluvioSource} (${pluvio} mm) supérieur aux besoins${note} (${max} mm) : excès d'eau (mildiou), aggravé par la sensibilité de la variété.`,
+          type: "negatif",
+        });
+      } else {
+        score -= 8;
+        raisons.push({
+          critere: "Pluviométrie",
+          message: `${pluvioSource} (${pluvio} mm) supérieur aux besoins${note} (${max} mm) : risque d'excès d'eau (mildiou).`,
+          type: "negatif",
+        });
+      }
     }
-  } else if (variety.besoins_pluvio_min_mm == null) {
+  } else if (exclusion == null && besoins == null) {
     raisons.push({
       critere: "Pluviométrie",
       message: "Besoins en eau non renseignés.",
       type: "neutre",
     });
-  } else {
+  } else if (exclusion == null) {
     raisons.push({
       critere: "Pluviométrie",
       message: "Données pluviométriques non disponibles pour la campagne.",
@@ -156,7 +255,6 @@ export function scoreVariety(
   // 3. Risque de séquences sèches
   const risqueSec =
     nbSec != null && dureeMaxSec != null && (nbSec >= 4 || dureeMaxSec >= 15);
-  const tol = toleranceLevel(variety.tolerance_secheresse);
   if (exclusion == null && risqueSec) {
     if (tol >= 2) {
       score += 15;
@@ -255,12 +353,99 @@ export function scoreVariety(
     raisons.push({ critere: "Objectif de production", message: "Valorisation du fan (fourrage) mentionnée pour cette variété.", type: "positif" });
   }
 
+  // 10. Résistance au mildiou (maladie majeure du mil, favorisée par l'humidité)
+  if (exclusion == null && resistances.mildiou != null) {
+    const niveau = resistanceScore(resistances.mildiou);
+    if (niveau >= 2) {
+      score += 4;
+      raisons.push({
+        critere: "Résistance au mildiou",
+        message: `Bonne résistance/tolérance au mildiou signalée (« ${resistances.mildiou} »).`,
+        type: "positif",
+      });
+    } else if (niveau <= -2) {
+      score -= 4;
+      raisons.push({
+        critere: "Résistance au mildiou",
+        message: `Sensibilité au mildiou signalée (« ${resistances.mildiou} »).`,
+        type: "negatif",
+      });
+    }
+  }
+
+  // 11. Résistance aux ravageurs (foreur de tige, chenille de l'épi)
+  if (exclusion == null && variety.reaction_ravageurs) {
+    const ravageurs = parseResistances(variety.reaction_ravageurs);
+    const scores = Object.values(ravageurs).map(resistanceScore);
+    if (scores.length > 0) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+      if (avg >= 2) {
+        score += 3;
+        raisons.push({
+          critere: "Résistance aux ravageurs",
+          message: "Bonne tolérance aux principaux ravageurs (foreur de tige, chenille de l'épi).",
+          type: "positif",
+        });
+      } else if (avg <= -2) {
+        score -= 3;
+        raisons.push({
+          critere: "Résistance aux ravageurs",
+          message: "Sensibilité aux principaux ravageurs (foreur de tige, chenille de l'épi).",
+          type: "negatif",
+        });
+      }
+    }
+  }
+
+  // 12. Rendement potentiel
+  if (exclusion == null && variety.rendement_potentiel_max_kg != null) {
+    const rMax = variety.rendement_potentiel_max_kg;
+    if (rMax >= 3000) {
+      score += 4;
+      raisons.push({
+        critere: "Rendement potentiel",
+        message: `Fort potentiel de rendement (jusqu'à ${rMax} kg/ha).`,
+        type: "positif",
+      });
+    } else if (rMax >= 2000) {
+      score += 2;
+      raisons.push({
+        critere: "Rendement potentiel",
+        message: `Rendement potentiel correct (jusqu'à ${rMax} kg/ha).`,
+        type: "neutre",
+      });
+    }
+  }
+
+  // 13. Préférence : tolérance à la sécheresse recherchée
+  if (exclusion == null && prefs.toleranceSecheresseRecherchee) {
+    if (tol >= 2) {
+      score += 4;
+      raisons.push({
+        critere: "Tolérance à la sécheresse",
+        message: "Variété tolérante à la sécheresse, conforme à votre recherche.",
+        type: "positif",
+      });
+    } else if (tol === 0) {
+      raisons.push({
+        critere: "Tolérance à la sécheresse",
+        message: "Tolérance à la sécheresse non documentée pour cette variété.",
+        type: "neutre",
+      });
+    }
+  }
+
   // Statut de validation -> impact sur la confiance uniquement
   let confiance: "elevee" | "moyenne" | "faible" = "elevee";
   let confianceRaison = "Données variétales et climatiques disponibles, source officielle.";
   if (climat == null) {
-    confiance = "faible";
-    confianceRaison = "Données climatiques absentes pour la campagne demandée.";
+    if (pluvioAnnuelle != null) {
+      confiance = "moyenne";
+      confianceRaison = "Données climatiques de campagne absentes : pluviométrie estimée via les isohyètes.";
+    } else {
+      confiance = "faible";
+      confianceRaison = "Données climatiques absentes pour la campagne demandée.";
+    }
   } else if (variety.statut_validation !== "officiel" || variety.statut === "en_evaluation") {
     confiance = "moyenne";
     confianceRaison = "Variété en évaluation ou données non encore officiellement validées.";

@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-type Tab = "varietes" | "communes" | "climat" | "retours" | "journal";
+type Tab = "varietes" | "zones" | "communes" | "climat" | "retours" | "journal";
 
 interface OverviewData {
   varieties: Record<string, unknown>[];
+  zones: Record<string, unknown>[];
   communes: Record<string, unknown>[];
   climat: Record<string, unknown>[];
   feedbacks: Record<string, unknown>[];
@@ -105,6 +106,22 @@ export function AdminDashboard({ username }: { username: string }) {
   // Communes / climat : formulaires simples
   const [communeForm, setCommuneForm] = useState({ nom: "", departement: "", region: "", latitude: "", longitude: "" });
   const [climatForm, setClimatForm] = useState({ commune_id: "", annee: "", cumul_pluvio_mm: "", duree_saison_jours: "", nb_sequences_seches: "", duree_max_seche_jours: "", prevision_saison: "" });
+
+  // Zones d'adaptation
+  const [zoneForm, setZoneForm] = useState({ variety_id: "", commune_id: "", zone_type: "officielle", source: "", niveau_confiance: "moyen" });
+  const [editingZoneId, setEditingZoneId] = useState<number | null>(null);
+  const [showZoneForm, setShowZoneForm] = useState(false);
+
+  // Import climat en masse
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    total: number;
+    inserted: number;
+    updated: number;
+    errors: { row: number; message: string }[];
+  } | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -294,11 +311,112 @@ export function AdminDashboard({ username }: { username: string }) {
     }
   }
 
+  async function handleClimatImport() {
+    if (!importFile) return;
+    setImporting(true);
+    setError("");
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", importFile);
+      const res = await fetch("/api/admin/climat/import", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Erreur lors de l'import.");
+      } else {
+        setImportResult(data);
+        if (importFileRef.current) importFileRef.current.value = "";
+        setImportFile(null);
+        load();
+      }
+    } catch {
+      setError("Impossible de contacter le serveur.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function downloadTemplate() {
+    const csv = [
+      "commune;departement;annee;cumul_pluvio_mm;date_debut_saison;date_fin_saison;duree_saison_jours;nb_sequences_seches;duree_max_seche_jours;temperature_moyenne_c;prevision_saison;source",
+      "Kaolack;Kaolack;2026;580;2026-06-15;2026-10-05;112;3;12;29.6;saison normale;mon-institution",
+      "Louga;Louga;2026;360;2026-07-12;2026-09-20;70;5;18;29.9;saison déficitaire;mon-institution",
+    ].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modele-import-climat.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---- Zones d'adaptation ----
+  function openNewZone() {
+    setZoneForm({ variety_id: "", commune_id: "", zone_type: "officielle", source: "", niveau_confiance: "moyen" });
+    setEditingZoneId(null);
+    setShowZoneForm(true);
+  }
+
+  function openEditZone(z: Record<string, unknown>) {
+    setZoneForm({
+      variety_id: String(z.variety_id ?? ""),
+      commune_id: String(z.commune_id ?? ""),
+      zone_type: String(z.zone_type ?? "officielle"),
+      source: String(z.source ?? ""),
+      niveau_confiance: String(z.niveau_confiance ?? "moyen"),
+    });
+    setEditingZoneId(Number(z.id));
+    setShowZoneForm(true);
+  }
+
+  async function saveZone(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    const payload = {
+      variety_id: Number(zoneForm.variety_id),
+      commune_id: Number(zoneForm.commune_id),
+      zone_type: zoneForm.zone_type,
+      source: zoneForm.source,
+      niveau_confiance: zoneForm.niveau_confiance,
+    };
+    try {
+      const res = editingZoneId
+        ? await fetch(`/api/admin/zones/${editingZoneId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/admin/zones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      if (!res.ok) {
+        const d = await res.json();
+        setError(d.error ?? "Erreur lors de l'enregistrement.");
+        return;
+      }
+      setShowZoneForm(false);
+      setEditingZoneId(null);
+      load();
+    } catch {
+      setError("Impossible de contacter le serveur.");
+    }
+  }
+
+  async function deleteZone(z: Record<string, unknown>) {
+    if (!confirm(`Supprimer la zone « ${z.zone_type} » pour « ${z.nom_officiel} » à ${z.commune_nom} ?`)) return;
+    await fetch(`/api/admin/zones/${z.id}`, { method: "DELETE" });
+    load();
+  }
+
   const inputCls =
     "border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-mil-400";
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "varietes", label: "Variétés" },
+    { key: "zones", label: "Zones d'adaptation" },
     { key: "communes", label: "Communes" },
     { key: "climat", label: "Climat" },
     { key: "retours", label: "Retours utilisateurs" },
@@ -543,6 +661,161 @@ export function AdminDashboard({ username }: { username: string }) {
             </div>
           )}
 
+          {tab === "zones" && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-stone-500">
+                  {data.zones.length} zone(s) d'adaptation
+                </p>
+                <button
+                  onClick={openNewZone}
+                  className="px-4 py-2 rounded-lg bg-mil-700 text-white text-sm font-semibold hover:bg-mil-800"
+                >
+                  + Nouvelle zone
+                </button>
+              </div>
+
+              {showZoneForm && (
+                <form
+                  onSubmit={saveZone}
+                  className="mb-6 rounded-xl border border-stone-200 bg-white p-6 shadow-sm grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+                >
+                  <h2 className="sm:col-span-2 lg:col-span-5 font-bold text-mil-900">
+                    {editingZoneId ? "Modifier la zone" : "Nouvelle zone d'adaptation"}
+                  </h2>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-stone-500">Variété *</label>
+                    <select
+                      value={zoneForm.variety_id}
+                      onChange={(e) => setZoneForm({ ...zoneForm, variety_id: e.target.value })}
+                      className={inputCls}
+                      required
+                    >
+                      <option value="">—</option>
+                      {data.varieties.map((v) => (
+                        <option key={String(v.id)} value={String(v.id)}>
+                          {String(v.nom_officiel)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-stone-500">Commune *</label>
+                    <select
+                      value={zoneForm.commune_id}
+                      onChange={(e) => setZoneForm({ ...zoneForm, commune_id: e.target.value })}
+                      className={inputCls}
+                      required
+                    >
+                      <option value="">—</option>
+                      {data.communes.map((c) => (
+                        <option key={String(c.id)} value={String(c.id)}>
+                          {String(c.nom)} ({String(c.region)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-stone-500">Type de zone *</label>
+                    <select
+                      value={zoneForm.zone_type}
+                      onChange={(e) => setZoneForm({ ...zoneForm, zone_type: e.target.value })}
+                      className={inputCls}
+                    >
+                      <option value="officielle">Officielle</option>
+                      <option value="historique">Historique</option>
+                      <option value="potentielle">Potentielle</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-stone-500">Niveau de confiance</label>
+                    <select
+                      value={zoneForm.niveau_confiance}
+                      onChange={(e) => setZoneForm({ ...zoneForm, niveau_confiance: e.target.value })}
+                      className={inputCls}
+                    >
+                      <option value="eleve">Élevé</option>
+                      <option value="moyen">Moyen</option>
+                      <option value="faible">Faible</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-stone-500">Source</label>
+                    <input
+                      value={zoneForm.source}
+                      onChange={(e) => setZoneForm({ ...zoneForm, source: e.target.value })}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-5 flex gap-3">
+                    <button type="submit" className="px-4 py-2 rounded-lg bg-mil-700 text-white text-sm font-semibold">
+                      Enregistrer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowZoneForm(false)}
+                      className="px-4 py-2 rounded-lg border border-stone-300 text-sm"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-stone-50 text-left text-stone-500">
+                      <th className="p-3 font-medium">Variété</th>
+                      <th className="p-3 font-medium">Commune</th>
+                      <th className="p-3 font-medium">Région</th>
+                      <th className="p-3 font-medium">Type</th>
+                      <th className="p-3 font-medium">Confiance</th>
+                      <th className="p-3 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.zones.map((z) => (
+                      <tr key={String(z.id)} className="border-t border-stone-100">
+                        <td className="p-3 font-medium text-stone-800">{String(z.nom_officiel)}</td>
+                        <td className="p-3 text-stone-600">{String(z.commune_nom)}</td>
+                        <td className="p-3 text-stone-600">{String(z.region)}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs ${
+                              z.zone_type === "officielle"
+                                ? "bg-leaf-100 text-leaf-700"
+                                : z.zone_type === "historique"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {String(z.zone_type)}
+                          </span>
+                        </td>
+                        <td className="p-3 text-stone-600">{String(z.niveau_confiance)}</td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => openEditZone(z)}
+                            className="px-2 py-1 text-xs text-mil-700 hover:underline"
+                          >
+                            Modifier
+                          </button>
+                          <button
+                            onClick={() => deleteZone(z)}
+                            className="px-2 py-1 text-xs text-red-600 hover:underline"
+                          >
+                            Supprimer
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {tab === "communes" && (
             <div>
               <form onSubmit={addCommune} className="mb-6 rounded-xl border border-stone-200 bg-white p-6 shadow-sm grid gap-4 sm:grid-cols-5">
@@ -602,6 +875,57 @@ export function AdminDashboard({ username }: { username: string }) {
 
           {tab === "climat" && (
             <div>
+              <div className="mb-6 rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold text-mil-900">Import en masse (CSV)</h2>
+                  <button onClick={downloadTemplate} className="px-3 py-1.5 rounded-lg border border-stone-300 text-sm hover:bg-stone-50">
+                    Télécharger le modèle
+                  </button>
+                </div>
+                <p className="mt-1 text-sm text-stone-500">
+                  Importez un fichier CSV contenant de nombreuses lignes de données
+                  climatiques d'un coup. Séparateur auto-détecté (point-virgule, virgule ou tabulation).
+                  Colonnes requises : <strong>commune</strong> et <strong>annee</strong>. Les autres colonnes
+                  sont facultatives. Les lignes déjà existantes (même commune + année) sont mises à jour.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3 items-center">
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".csv,.txt,text/csv,text/plain"
+                    onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  <button
+                    onClick={handleClimatImport}
+                    disabled={!importFile || importing}
+                    className="px-4 py-2 rounded-lg bg-mil-700 text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    {importing ? "Import en cours…" : "Importer le fichier"}
+                  </button>
+                </div>
+
+                {importResult && (
+                  <div className="mt-4 rounded-lg bg-stone-50 border border-stone-200 p-4 text-sm">
+                    <p>
+                      <strong>{importResult.total}</strong> ligne(s) lue(s) —{" "}
+                      <span className="text-leaf-700">{importResult.inserted} insérée(s)</span>,{" "}
+                      <span className="text-blue-700">{importResult.updated} mise(s) à jour</span>,{" "}
+                      <span className="text-red-700">{importResult.errors.length} erreur(s)</span>.
+                    </p>
+                    {importResult.errors.length > 0 && (
+                      <ul className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                        {importResult.errors.map((err, i) => (
+                          <li key={i} className="text-red-700">
+                            Ligne {err.row} : {err.message}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <form onSubmit={addClimat} className="mb-6 rounded-xl border border-stone-200 bg-white p-6 shadow-sm grid gap-4 sm:grid-cols-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-stone-500">Commune *</label>

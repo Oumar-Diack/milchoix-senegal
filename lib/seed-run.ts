@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { varieties } from "./seed-data";
 import { communes, climats, varietyZones } from "./seed-data-climat";
+import { getIsohyetes } from "./isohyetes";
 import { hashPassword } from "./auth";
 
 export function seedAll(db: DatabaseSync, options: { reset?: boolean } = {}): void {
@@ -13,7 +14,8 @@ export function seedAll(db: DatabaseSync, options: { reset?: boolean } = {}): vo
     db.exec("DELETE FROM recommendations;");
     db.exec("DELETE FROM feedback;");
     db.exec("DELETE FROM audit_log;");
-    db.exec("DELETE FROM sqlite_sequence WHERE name IN ('varieties','communes','climat','variety_zones','users','recommendations','feedback','audit_log');");
+    db.exec("DELETE FROM isohyetes;");
+    db.exec("DELETE FROM sqlite_sequence WHERE name IN ('varieties','communes','climat','variety_zones','users','recommendations','feedback','audit_log','isohyetes');");
   }
 
   const insertVariety = db.prepare(`
@@ -79,6 +81,14 @@ export function seedAll(db: DatabaseSync, options: { reset?: boolean } = {}): vo
     const cid = communeIdByName.get(z.commune);
     if (!vid || !cid) continue;
     insertZone.run(vid, cid, z.zone_type, z.source, z.niveau_confiance);
+  }
+
+  // Isohyètes de pluviométrie annuelle (Sénégal)
+  const insertIsohyete = db.prepare(
+    "INSERT INTO isohyetes (contour_mm, geometry, source) VALUES (?, ?, 'Shapefile isohyete (SN)')"
+  );
+  for (const iso of getIsohyetes()) {
+    insertIsohyete.run(iso.contour_mm, JSON.stringify(iso.lines));
   }
 
   // Utilisateur administrateur par défaut
