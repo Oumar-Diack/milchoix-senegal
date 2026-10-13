@@ -54,7 +54,7 @@ export default function HomePage() {
             <p className="text-4xl font-extrabold text-mil-700">
               {communes.length}
             </p>
-            <p className="mt-1 text-stone-600">localités couvertes</p>
+            <p className="mt-1 text-stone-600">départements du Sénégal couverts</p>
           </div>
           <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
             <p className="text-4xl font-extrabold text-mil-700">4</p>

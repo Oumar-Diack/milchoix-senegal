@@ -31,7 +31,7 @@ const VARIETY_FORM_FIELDS: { key: string; label: string; type: "text" | "number"
   { key: "annee_homologation", label: "Année d'homologation", type: "number" },
   { key: "obtenteur", label: "Obtenteur", type: "text" },
   { key: "type_mil", label: "Type de mil", type: "text" },
-  { key: "duree_cycle_jours", label: "Durée de cycle (jours)", type: "number" },
+  { key: "duree_cycle_jours", label: "Durée de cycle (jours)", type: "text" },
   {
     key: "precocite",
     label: "Précocité",

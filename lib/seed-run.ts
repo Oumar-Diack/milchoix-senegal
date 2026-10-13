@@ -23,16 +23,14 @@ export function seedAll(db: DatabaseSync, options: { reset?: boolean } = {}): vo
       nom_officiel, noms_locaux, statut, annee_homologation, obtenteur, type_mil,
       duree_cycle_jours, precocite, besoins_pluvio_min_mm, besoins_pluvio_max_mm,
       tolerance_secheresse, resistances_maladies, reaction_ravageurs,
-      rendement_potentiel_min_kg, rendement_potentiel_max_kg, rendement_observe_moyen_kg,
-      caracteristiques_grain, usages_alimentaires, exigences_pedologiques,
-      disponibilite_semences, description, source, statut_validation
+      rendement_potentiel_min_kg, rendement_potentiel_max_kg,
+      caracteristiques_grain, disponibilite_semences, description, source, statut_validation
     ) VALUES (
       :nom_officiel, :noms_locaux, :statut, :annee_homologation, :obtenteur, :type_mil,
       :duree_cycle_jours, :precocite, :besoins_pluvio_min_mm, :besoins_pluvio_max_mm,
       :tolerance_secheresse, :resistances_maladies, :reaction_ravageurs,
-      :rendement_potentiel_min_kg, :rendement_potentiel_max_kg, :rendement_observe_moyen_kg,
-      :caracteristiques_grain, :usages_alimentaires, :exigences_pedologiques,
-      :disponibilite_semences, :description, :source, :statut_validation
+      :rendement_potentiel_min_kg, :rendement_potentiel_max_kg,
+      :caracteristiques_grain, :disponibilite_semences, :description, :source, :statut_validation
     )
   `);
 

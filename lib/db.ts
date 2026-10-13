@@ -37,7 +37,7 @@ export function createSchema(db: DatabaseSync): void {
       annee_homologation INTEGER,
       obtenteur TEXT NOT NULL DEFAULT '',
       type_mil TEXT NOT NULL DEFAULT '',
-      duree_cycle_jours INTEGER,
+      duree_cycle_jours TEXT,
       precocite TEXT NOT NULL DEFAULT '',
       besoins_pluvio_min_mm INTEGER,
       besoins_pluvio_max_mm INTEGER,
@@ -155,6 +155,76 @@ export function createSchema(db: DatabaseSync): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  migrateVarietyCycleType(db);
+}
+
+function migrateVarietyCycleType(db: DatabaseSync): void {
+  const cols = db.prepare("PRAGMA table_info(varieties)").all() as { name: string; type: string }[];
+  const col = cols.find((c) => c.name === "duree_cycle_jours");
+  if (!col || String(col.type).toUpperCase() === "TEXT") return;
+
+  db.exec("PRAGMA foreign_keys = OFF;");
+  db.exec("BEGIN;");
+  db.exec(`
+    CREATE TABLE varieties_migrated (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom_officiel TEXT NOT NULL,
+      noms_locaux TEXT NOT NULL DEFAULT '',
+      statut TEXT NOT NULL DEFAULT 'homologuee',
+      annee_homologation INTEGER,
+      obtenteur TEXT NOT NULL DEFAULT '',
+      type_mil TEXT NOT NULL DEFAULT '',
+      duree_cycle_jours TEXT,
+      precocite TEXT NOT NULL DEFAULT '',
+      besoins_pluvio_min_mm INTEGER,
+      besoins_pluvio_max_mm INTEGER,
+      tolerance_secheresse TEXT NOT NULL DEFAULT '',
+      resistances_maladies TEXT NOT NULL DEFAULT '',
+      reaction_ravageurs TEXT NOT NULL DEFAULT '',
+      rendement_potentiel_min_kg REAL,
+      rendement_potentiel_max_kg REAL,
+      rendement_observe_moyen_kg REAL,
+      caracteristiques_grain TEXT NOT NULL DEFAULT '',
+      usages_alimentaires TEXT NOT NULL DEFAULT '',
+      exigences_pedologiques TEXT NOT NULL DEFAULT '',
+      disponibilite_semences TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT '',
+      date_maj TEXT NOT NULL DEFAULT (datetime('now')),
+      statut_validation TEXT NOT NULL DEFAULT 'officiel',
+      published INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT INTO varieties_migrated (
+      id, nom_officiel, noms_locaux, statut, annee_homologation, obtenteur, type_mil,
+      duree_cycle_jours, precocite, besoins_pluvio_min_mm, besoins_pluvio_max_mm,
+      tolerance_secheresse, resistances_maladies, reaction_ravageurs,
+      rendement_potentiel_min_kg, rendement_potentiel_max_kg, rendement_observe_moyen_kg,
+      caracteristiques_grain, usages_alimentaires, exigences_pedologiques,
+      disponibilite_semences, description, source, date_maj, statut_validation,
+      published, created_at, updated_at
+    )
+    SELECT
+      id, nom_officiel, noms_locaux, statut, annee_homologation, obtenteur, type_mil,
+      CAST(duree_cycle_jours AS TEXT), precocite, besoins_pluvio_min_mm, besoins_pluvio_max_mm,
+      tolerance_secheresse, resistances_maladies, reaction_ravageurs,
+      rendement_potentiel_min_kg, rendement_potentiel_max_kg, rendement_observe_moyen_kg,
+      caracteristiques_grain, usages_alimentaires, exigences_pedologiques,
+      disponibilite_semences, description, source, date_maj, statut_validation,
+      published, created_at, updated_at
+    FROM varieties;
+
+    DROP TABLE varieties;
+    ALTER TABLE varieties_migrated RENAME TO varieties;
+
+    DELETE FROM sqlite_sequence WHERE name = 'varieties';
+    INSERT INTO sqlite_sequence (name, seq) SELECT 'varieties', COALESCE(MAX(id), 0) FROM varieties;
+  `);
+  db.exec("COMMIT;");
+  db.exec("PRAGMA foreign_keys = ON;");
 }
 
 export { DB_PATH };

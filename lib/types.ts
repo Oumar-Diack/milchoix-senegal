@@ -6,7 +6,7 @@ export interface Variety {
   annee_homologation: number | null;
   obtenteur: string;
   type_mil: string;
-  duree_cycle_jours: number | null;
+  duree_cycle_jours: string | null;
   precocite: string;
   besoins_pluvio_min_mm: number | null;
   besoins_pluvio_max_mm: number | null;

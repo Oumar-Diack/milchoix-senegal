@@ -63,6 +63,14 @@ function toleranceLevel(variety: Variety): number {
   return 0;
 }
 
+// Extrait la durée de cycle maximale d'une valeur (entier ou plage « 85-95 »).
+function parseCycleMax(cycle: string | null): number | null {
+  if (cycle == null) return null;
+  const nums = (cycle.match(/\d+/g) ?? []).map(Number);
+  if (nums.length === 0) return null;
+  return Math.max(...nums);
+}
+
 // Parse une chaîne "Maladie : niveau ; Maladie : niveau" du catalogue en dictionnaire.
 function parseResistances(text: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -139,7 +147,8 @@ export function scoreVariety(
   let score = 55;
   let exclusion: Reason | null = null;
 
-  const cycle = variety.duree_cycle_jours;
+  const cycleRaw = variety.duree_cycle_jours;
+  const cycle = parseCycleMax(cycleRaw);
   const dureeSaison = climat?.duree_saison_jours ?? null;
   const cumul = climat?.cumul_pluvio_mm ?? null;
   const nbSec = climat?.nb_sequences_seches ?? null;
@@ -155,28 +164,28 @@ export function scoreVariety(
     if (cycle > dureeSaison) {
       exclusion = {
         critere: "Durée du cycle",
-        message: `Le cycle (${cycle} j) dépasse la durée probable de la saison (${dureeSaison} j).`,
+        message: `Le cycle (${cycleRaw} j) dépasse la durée probable de la saison (${dureeSaison} j).`,
         type: "negatif",
       };
     } else if (cycle <= dureeSaison - 15) {
       score += 25;
       raisons.push({
         critere: "Durée du cycle",
-        message: `Cycle de ${cycle} jours compatible avec une saison de ${dureeSaison} jours (marge de sécurité suffisante).`,
+        message: `Cycle de ${cycleRaw} jours compatible avec une saison de ${dureeSaison} jours (marge de sécurité suffisante).`,
         type: "positif",
       });
     } else if (cycle <= dureeSaison - 5) {
       score += 12;
       raisons.push({
         critere: "Durée du cycle",
-        message: `Cycle de ${cycle} jours compatible avec la saison (${dureeSaison} j), marge réduite.`,
+        message: `Cycle de ${cycleRaw} jours compatible avec la saison (${dureeSaison} j), marge réduite.`,
         type: "neutre",
       });
     } else {
       score -= 10;
       raisons.push({
         critere: "Durée du cycle",
-        message: `Cycle de ${cycle} jours très proche de la durée de la saison (${dureeSaison} j) : risque si la saison se raccourcit.`,
+        message: `Cycle de ${cycleRaw} jours très proche de la durée de la saison (${dureeSaison} j) : risque si la saison se raccourcit.`,
         type: "negatif",
       });
     }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getVariety, getVarietyZones, getVarietyPhotos } from "@/lib/queries";
 import { STATUT_LABELS, VALIDATION_LABELS, ZONE_TYPE_LABELS } from "@/lib/labels";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { ItineraireTechnique } from "@/components/ItineraireTechnique";
 
 export default async function VarietyDetailPage({
   params,
@@ -130,6 +131,8 @@ export default async function VarietyDetailPage({
           </Link>
         </div>
       </div>
+
+      <ItineraireTechnique />
 
       <div className="mt-6 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-500">
         <p>

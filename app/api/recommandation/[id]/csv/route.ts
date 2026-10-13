@@ -6,7 +6,7 @@ interface CsvResult {
   variety_id: number;
   nom_officiel: string;
   precocite: string;
-  duree_cycle_jours: number | null;
+  duree_cycle_jours: string | null;
   besoins_pluvio_min_mm: number | null;
   besoins_pluvio_max_mm: number | null;
   tolerance_secheresse: string;

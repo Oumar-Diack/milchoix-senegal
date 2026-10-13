@@ -29,7 +29,7 @@ export default function RootLayout({
         <header className="sticky top-0 z-40 bg-mil-900 text-white shadow">
           <div className="mx-auto max-w-6xl px-4 flex items-center justify-between h-14">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-              <span className="inline-block h-7 w-7 rounded-full bg-mil-400 text-mil-950 grid place-items-center font-extrabold">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-mil-400 text-mil-950 font-extrabold leading-none">
                 M
               </span>
               <span>MilChoix Sénégal</span>

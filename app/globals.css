@@ -1,6 +1,29 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-mil-50: #fdf8ec;
+  --color-mil-100: #f9edc9;
+  --color-mil-200: #f2d98e;
+  --color-mil-300: #eac254;
+  --color-mil-400: #e4ac2e;
+  --color-mil-500: #d4911f;
+  --color-mil-600: #b76e18;
+  --color-mil-700: #924f17;
+  --color-mil-800: #793f19;
+  --color-mil-900: #663518;
+  --color-mil-950: #3b1b0a;
+
+  --color-leaf-50: #f0f9f0;
+  --color-leaf-100: #dcf0dc;
+  --color-leaf-200: #bbe1bb;
+  --color-leaf-300: #8ccb8d;
+  --color-leaf-400: #5aac5b;
+  --color-leaf-500: #389139;
+  --color-leaf-600: #287529;
+  --color-leaf-700: #215c23;
+  --color-leaf-800: #1d4a1f;
+  --color-leaf-900: #183d1a;
+}
 
 @layer base {
   :root {
@@ -14,10 +37,8 @@
   }
 }
 
-@layer utilities {
-  .leaflet-container {
-    height: 100%;
-    width: 100%;
-    z-index: 0;
-  }
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
 }
