@@ -134,26 +134,3 @@ npm run test:reco
 ```
 
 Les suites `chat:eval` et `test:reco` s'appuient sur une base seedée.
-
-## Déploiement
-
-L'application est prévue pour un serveur unique avec disque persistant
-(VPS), SQLite ne nécessitant aucun service externe :
-
-1. installer Node.js sur le serveur ;
-2. `npm ci && npm run db:seed && npm run build` ;
-3. lancer `npm run start` derrière un reverse proxy HTTPS (Nginx/Caddy) ;
-4. définir `MILCHOIX_SECRET` et les identifiants admin ;
-5. sauvegarder régulièrement le fichier `data/milchoix.db`.
-
-Les plateformes à système de fichiers éphémère ne conviennent pas telles quelles :
-la base serait perdue à chaque déploiement.
-
-## Limites
-
-- Les recommandations sont une **aide à la décision** : elles ne remplacent ni
-  l'expérience du producteur ni l'avis d'un conseiller.
-- Les dates de début/fin de saison et la durée maximale des sécheresses ne sont
-  pas disponibles dans la source climatique mensuelle.
-- Le chat ne répond que sur le périmètre de la plateforme ; toute question hors
-  base est refusée et journalisée.
