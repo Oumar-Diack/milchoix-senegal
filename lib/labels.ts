@@ -34,6 +34,8 @@ export const TYPE_SOLS = [
   "Sols limono-sableux (Balègne-Dior)",
   "Sols argilo-sableux (Deck-Dior)",
   "Sols argilo-limoneux (Ban-Balègne)",
+  "Sols sablo-argileux (Dior-Deck)",
+  "Sols limono-argileux (Balègne-Ban)",
 ];
 
 export const OBJECTIFS_PRODUCTION = [

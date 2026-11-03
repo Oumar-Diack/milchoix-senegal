@@ -53,7 +53,7 @@ bas-fonds argileux (deck), éviter les sols salés
 sols argilo-limoneux (ban-balègne)
 ```
 
-Les huit types proposés dans le formulaire de recommandation sont :
+Les dix types proposés dans le formulaire de recommandation sont :
 
 ```text
 Sols sableux (Dior)
@@ -64,6 +64,8 @@ Sols sablo-limoneux (Dior-Balègne)
 Sols limono-sableux (Balègne-Dior)
 Sols argilo-sableux (Deck-Dior)
 Sols argilo-limoneux (Ban-Balègne)
+Sols sablo-argileux (Dior-Deck)
+Sols limono-argileux (Balègne-Ban)
 ```
 
 Une valeur sans texture ni nom local reconnu est enregistrée mais signalée par

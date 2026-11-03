@@ -28,10 +28,12 @@ const EXPECTED_SOILS = [
   "Sols limono-sableux (Balègne-Dior)",
   "Sols argilo-sableux (Deck-Dior)",
   "Sols argilo-limoneux (Ban-Balègne)",
+  "Sols sablo-argileux (Dior-Deck)",
+  "Sols limono-argileux (Balègne-Ban)",
 ];
 
 check(
-  "liste officielle des 8 types de sol",
+  "liste officielle des 10 types de sol",
   TYPE_SOLS.length === EXPECTED_SOILS.length &&
     EXPECTED_SOILS.every((soil, index) => TYPE_SOLS[index] === soil),
   JSON.stringify(TYPE_SOLS)
@@ -46,6 +48,8 @@ const textureCases: { soil: string; textures: string[] }[] = [
   { soil: "Sols limono-sableux (Balègne-Dior)", textures: ["limon", "sable"] },
   { soil: "Sols argilo-sableux (Deck-Dior)", textures: ["argile", "sable"] },
   { soil: "Sols argilo-limoneux (Ban-Balègne)", textures: ["argile", "limon"] },
+  { soil: "Sols sablo-argileux (Dior-Deck)", textures: ["sable", "argile"] },
+  { soil: "Sols limono-argileux (Balègne-Ban)", textures: ["limon", "argile"] },
 ];
 
 for (const { soil, textures } of textureCases) {
@@ -63,6 +67,9 @@ const compatibilityCases: [string, string, boolean][] = [
   ["Sols argileux (Deck)", "argileux", true],
   ["Sols limoneux (Balègne)", "sols sableux", false],
   ["Sols argileux lourds (Ban)", "sols argilo-limoneux", true],
+  ["Sols sablo-argileux (Dior-Deck)", "sols argileux lourds", true],
+  ["Sols limono-argileux (Balègne-Ban)", "sols limoneux", true],
+  ["Sols limono-argileux (Balègne-Ban)", "sols sableux", false],
   ["Sols dek-dior", "sols sableux", true],
   ["SOLS ARGILEUX", "sols argileux lourds", true],
   ["Sols sableux (Dior)", "", false],

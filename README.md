@@ -18,5 +18,5 @@ Procédure détaillée et vocabulaire accepté : [`docs/import-traits-varietes.m
 ```bash
 npm run chat:eval    # 47 contrôles FR/EN/WO
 npm run test:traits  # 27 contrôles de l'import des caractéristiques
-npm run test:soil    # 21 contrôles des types de sol
+npm run test:soil    # 26 contrôles des types de sol
 ```
