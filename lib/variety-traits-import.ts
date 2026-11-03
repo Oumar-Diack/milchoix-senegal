@@ -12,6 +12,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import { normalizeKey, parseDelimited } from "./csv-parse";
+import { soilTextures } from "./soil";
 
 export type TraitField =
   | "exigences_pedologiques"
@@ -88,7 +89,7 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   ],
 };
 
-const SOIL_KEYWORDS = ["sable", "argile", "limon"];
+const SOIL_HINT = "sable, argile, limon, dior, deck, ban, balègne";
 
 const USAGE_VOCABULARY = new Set([
   "grain",
@@ -171,9 +172,8 @@ function parseYield(raw: string): { value: number | null; error?: string } {
 }
 
 function soilWarning(value: string): string | null {
-  const normalized = normalizeKey(value);
-  if (SOIL_KEYWORDS.some((keyword) => normalized.includes(keyword))) return null;
-  return "Sol sans mot-clé sable/argile/limon : la valeur est enregistrée mais le filtre sol du chat ne la reconnaîtra pas.";
+  if (soilTextures(value).size > 0) return null;
+  return `Sol sans texture reconnue (${SOIL_HINT}) : la valeur est enregistrée mais le filtre sol du chat ne la reconnaîtra pas.`;
 }
 
 function usageWarnings(value: string): string[] {

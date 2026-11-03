@@ -23,6 +23,7 @@ import {
   type Usage,
 } from "./chat-context";
 import { searchKnowledge } from "./chat-knowledge";
+import { soilsCompatible } from "./soil";
 
 export type ChatLanguage = "fr" | "en" | "wo";
 
@@ -901,9 +902,30 @@ function parseNumberBeforeUnit(text: string, units: string[]): number | null {
 }
 
 function parseSoil(text: string): Soil | null {
-  if (hasPhrase(text, "sable") || hasPhrase(text, "sableux")) return "sable";
-  if (hasPhrase(text, "argile") || hasPhrase(text, "argileux")) return "argile";
-  if (hasPhrase(text, "limon") || hasPhrase(text, "limoneux")) return "limon";
+  if (
+    text.includes("sablo") ||
+    hasPhrase(text, "sable") ||
+    hasPhrase(text, "sableux") ||
+    hasPhrase(text, "dior")
+  ) {
+    return "sable";
+  }
+  if (
+    text.includes("argilo") ||
+    hasPhrase(text, "argile") ||
+    hasPhrase(text, "argileux") ||
+    hasAnyPhrase(text, ["deck", "dek", "ban"])
+  ) {
+    return "argile";
+  }
+  if (
+    text.includes("limono") ||
+    hasPhrase(text, "limon") ||
+    hasPhrase(text, "limoneux") ||
+    hasPhrase(text, "balegne")
+  ) {
+    return "limon";
+  }
   return null;
 }
 
@@ -1219,7 +1241,7 @@ function filteredListAnswer(
     const withSoil = varieties.filter((variety) => variety.exigences_pedologiques.trim());
     if (withSoil.length > 0) {
       list = list.filter((variety) =>
-        normalize(variety.exigences_pedologiques).includes(query.soil as string)
+        soilsCompatible(query.soil as string, variety.exigences_pedologiques)
       );
       applied.push(`${L.soilLabel} : ${query.soil}`);
       const missing = varieties.length - withSoil.length;

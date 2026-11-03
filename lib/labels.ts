@@ -26,12 +26,14 @@ export const CONFIANCE_LABELS: Record<string, string> = {
 };
 
 export const TYPE_SOLS = [
-  "Sols sableux",
-  "Sols sablo-argileux",
-  "Sols argileux",
-  "Sols limoneux",
-  "Sols dek-dior",
-  "Sols de bas-fonds",
+  "Sols sableux (Dior)",
+  "Sols argileux (Deck)",
+  "Sols argileux lourds (Ban)",
+  "Sols limoneux (Balègne)",
+  "Sols sablo-limoneux (Dior-Balègne)",
+  "Sols limono-sableux (Balègne-Dior)",
+  "Sols argilo-sableux (Deck-Dior)",
+  "Sols argilo-limoneux (Ban-Balègne)",
 ];
 
 export const OBJECTIFS_PRODUCTION = [

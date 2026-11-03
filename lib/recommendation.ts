@@ -1,4 +1,5 @@
 import type { Variety, Climat, Preferences } from "./types";
+import { soilsCompatible } from "./soil";
 
 export type Classification =
   | "fortement_recommandee"
@@ -350,13 +351,7 @@ export function scoreVariety(
 
   // 8. Type de sol
   if (exclusion == null && prefs.typeSol && variety.exigences_pedologiques) {
-    const sol = prefs.typeSol.toLowerCase();
-    const exig = variety.exigences_pedologiques.toLowerCase();
-    const match =
-      (sol.includes("sable") && exig.includes("sable")) ||
-      (sol.includes("argile") && exig.includes("argile")) ||
-      (sol.includes("limon") && exig.includes("limon"));
-    if (match) {
+    if (soilsCompatible(prefs.typeSol, variety.exigences_pedologiques)) {
       score += 5;
       raisons.push({ critere: "Type de sol", message: "Exigences pédologiques compatibles avec le type de sol indiqué.", type: "positif" });
     }

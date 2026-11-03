@@ -39,17 +39,36 @@ existante par accident.
 
 ### Sol
 
-Texte libre, mais pour rester filtrable dans le chat, mentionnez au moins un de
-ces mots-clés : `sable`, `argile`, `limon` (les variantes `sableux`, `argileux`,
-`limoneux` fonctionnent aussi).
+Texte libre, mais pour rester filtrable dans le chat et le moteur de
+recommandation, mentionnez au moins une texture ou un nom local reconnu :
+
+- textures : `sable`, `argile`, `limon` (les variantes `sableux`, `sablo-`,
+  `argileux`, `argilo-`, `limoneux`, `limono-` fonctionnent aussi) ;
+- noms locaux : `dior` (sableux), `deck`/`dek` (argileux), `ban` (argileux
+  lourd), `balègne` (limoneux).
 
 ```text
 sols sableux à sablo-argileux, supporte le dior
-bas-fonds argileux, éviter les sols salés
+bas-fonds argileux (deck), éviter les sols salés
+sols argilo-limoneux (ban-balègne)
 ```
 
-Une valeur sans ces mots-clés est enregistrée mais signalée par un
-avertissement : le chat ne pourra pas la reconnaître comme critère.
+Les huit types proposés dans le formulaire de recommandation sont :
+
+```text
+Sols sableux (Dior)
+Sols argileux (Deck)
+Sols argileux lourds (Ban)
+Sols limoneux (Balègne)
+Sols sablo-limoneux (Dior-Balègne)
+Sols limono-sableux (Balègne-Dior)
+Sols argilo-sableux (Deck-Dior)
+Sols argilo-limoneux (Ban-Balègne)
+```
+
+Une valeur sans texture ni nom local reconnu est enregistrée mais signalée par
+un avertissement : ni le chat ni le moteur ne pourront l'utiliser comme
+critère.
 
 ### Usages
 
