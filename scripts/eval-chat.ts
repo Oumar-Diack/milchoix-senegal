@@ -203,7 +203,7 @@ const cases: EvalCase[] = [
     name: "biofortifie",
     question: "quelles variétés biofortifiées ?",
     lang: "fr",
-    includes: ["CHAKTI", "usages (déduits des descriptions)"],
+    includes: ["CHAKTI", "usages : biofortifié", "déduits des descriptions"],
     notIncludes: ["Gawane"],
   },
   {
@@ -216,7 +216,7 @@ const cases: EvalCase[] = [
     name: "couscous",
     question: "variétés pour le couscous",
     lang: "fr",
-    includes: ["usages (déduits des descriptions)"],
+    includes: ["usages", "déduits des descriptions"],
   },
   {
     name: "sol-sableux",

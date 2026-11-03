@@ -5,7 +5,11 @@ import fs from "node:fs";
 const globalForDb = globalThis as unknown as { __milchoixDb?: DatabaseSync };
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "milchoix.db");
+// Surcharge possible pour les sauvegardes et les tests (copie de la base) :
+// MILCHOIX_DB_PATH=/chemin/vers/copie.db
+const DB_PATH = process.env.MILCHOIX_DB_PATH
+  ? path.resolve(process.env.MILCHOIX_DB_PATH)
+  : path.join(DATA_DIR, "milchoix.db");
 
 export function getDb(): DatabaseSync {
   if (globalForDb.__milchoixDb) return globalForDb.__milchoixDb;

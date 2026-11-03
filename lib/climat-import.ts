@@ -1,73 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-
-// ---------- Parsing CSV / TSV ----------
-
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-function detectDelimiter(text: string): string {
-  const firstLine = text.split("\n")[0] ?? "";
-  const candidates = [";", ",", "\t"];
-  let best = ";";
-  let bestCount = -1;
-  for (const d of candidates) {
-    const count = firstLine.split(d).length - 1;
-    if (count > bestCount) {
-      bestCount = count;
-      best = d;
-    }
-  }
-  return best;
-}
-
-function parseDelimited(text: string): string[][] {
-  const delimiter = detectDelimiter(text);
-  const normalized = text.replace(/\r\n?/g, "\n");
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let i = 0; i < normalized.length; i++) {
-    const c = normalized[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (normalized[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += c;
-      }
-    } else {
-      if (c === '"') {
-        inQuotes = true;
-      } else if (c === delimiter) {
-        row.push(field);
-        field = "";
-      } else if (c === "\n") {
-        row.push(field);
-        field = "";
-        rows.push(row);
-        row = [];
-      } else {
-        field += c;
-      }
-    }
-  }
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.some((f) => f.trim() !== ""));
-}
+import { normalizeKey, parseDelimited } from "./csv-parse";
 
 // ---------- Import climat ----------
 
@@ -96,10 +28,10 @@ const ALIASES: Record<string, string[]> = {
 function buildColumnMap(headers: string[]): Map<string, number> {
   const map = new Map<string, number>();
   headers.forEach((h, i) => {
-    const norm = normalize(h);
+    const norm = normalizeKey(h);
     if (!norm) return;
     for (const [field, aliases] of Object.entries(ALIASES)) {
-      if (aliases.some((a) => normalize(a) === norm)) {
+      if (aliases.some((a) => normalizeKey(a) === norm)) {
         if (!map.has(field)) map.set(field, i);
       }
     }
@@ -155,9 +87,9 @@ export function importClimatCSV(db: DatabaseSync, text: string): ImportResult {
   const byName = new Map<string, number>();
   const byNameDept = new Map<string, number>();
   for (const c of communes) {
-    const n = normalize(c.nom);
+    const n = normalizeKey(c.nom);
     if (!byName.has(n)) byName.set(n, c.id);
-    byNameDept.set(`${n}|${normalize(c.departement)}`, c.id);
+    byNameDept.set(`${n}|${normalizeKey(c.departement)}`, c.id);
   }
 
   const get = (row: string[], key: string): string | undefined => {
@@ -205,8 +137,8 @@ export function importClimatCSV(db: DatabaseSync, text: string): ImportResult {
         continue;
       }
       const dept = get(row, "departement")?.trim();
-      let communeId = dept ? byNameDept.get(`${normalize(communeName)}|${normalize(dept)}`) : undefined;
-      if (communeId == null) communeId = byName.get(normalize(communeName));
+      let communeId = dept ? byNameDept.get(`${normalizeKey(communeName)}|${normalizeKey(dept)}`) : undefined;
+      if (communeId == null) communeId = byName.get(normalizeKey(communeName));
       if (communeId == null) {
         errors.push({ row: rowNum, message: `Commune inconnue : « ${communeName} ».` });
         continue;

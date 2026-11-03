@@ -9,6 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "chat:eval": "tsx scripts/eval-chat.ts",
+    "data:traits": "tsx scripts/import-variety-traits.ts",
+    "test:traits": "tsx scripts/test-variety-traits-import.ts",
     "db:seed": "tsx lib/seed.ts",
     "db:photos": "tsx lib/seed-photos.ts"
   },

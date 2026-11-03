@@ -150,7 +150,10 @@ const FR_DATA = {
   typeLabel: "Type",
   grain: "Grain",
   usageLabel: "Usages alimentaires",
-  usageFilter: "usages (déduits des descriptions)",
+  usageFilter: "usages",
+  inferredFromDescriptions: "déduits des descriptions",
+  soilLabel: "sol",
+  varietiesWithoutData: "variété(s) sans donnée, exclue(s) du filtre",
   zoneLabel: "Zone",
   criteriaApplied: "Critères appliqués",
   criteriaIgnored: "Critères ignorés (non renseignés en base)",
@@ -209,7 +212,10 @@ const EN_DATA: typeof FR_DATA = {
   typeLabel: "Type",
   grain: "Grain",
   usageLabel: "Food uses",
-  usageFilter: "uses (inferred from descriptions)",
+  usageFilter: "uses",
+  inferredFromDescriptions: "inferred from descriptions",
+  soilLabel: "soil",
+  varietiesWithoutData: "variety(ies) without data, excluded from the filter",
   zoneLabel: "Zone",
   criteriaApplied: "Criteria applied",
   criteriaIgnored: "Criteria ignored (not recorded in the database)",
@@ -1098,6 +1104,36 @@ function isSeedAvailable(variety: Variety): boolean {
   return value.startsWith("semences disponibles");
 }
 
+// Vocabulaire des usages : il doit accepter aussi bien une valeur saisie en
+// base (« grain, couscous, fourrage ») qu'un texte de description.
+const GRAIN_PRODUCTS = [
+  "couscous",
+  "thiere",
+  "latchiri",
+  "sankhal",
+  "bouillie",
+  "semoule",
+  "farine",
+  "alimentation",
+  "consommation",
+  "transformation",
+];
+
+function matchesUsage(haystack: string, usage: Usage): boolean {
+  if (usage === "biofortifie") return haystack.includes("biofortifie");
+  if (usage === "fourrage") {
+    return hasAnyPhrase(haystack, ["fourrage", "double usage", "paille", "fan"]);
+  }
+  return hasAnyPhrase(haystack, ["grain", ...GRAIN_PRODUCTS]);
+}
+
+// Dans une description, « grain » est trop générique (« gros grains ») : on
+// n'accepte que les produits et préparations réellement alimentaires.
+function descriptionMatchesUsage(haystack: string, usage: Usage): boolean {
+  if (usage === "grain") return hasAnyPhrase(haystack, GRAIN_PRODUCTS);
+  return matchesUsage(haystack, usage);
+}
+
 function cycleUpperBound(variety: Variety): number | null {
   if (!variety.duree_cycle_jours) return null;
   const numbers = variety.duree_cycle_jours.match(/\d+/g);
@@ -1180,14 +1216,18 @@ function filteredListAnswer(
   }
 
   if (query.soil) {
-    const hasSoilData = varieties.some((variety) => variety.exigences_pedologiques.trim());
-    if (hasSoilData) {
+    const withSoil = varieties.filter((variety) => variety.exigences_pedologiques.trim());
+    if (withSoil.length > 0) {
       list = list.filter((variety) =>
         normalize(variety.exigences_pedologiques).includes(query.soil as string)
       );
-      applied.push(`sol : ${query.soil}`);
+      applied.push(`${L.soilLabel} : ${query.soil}`);
+      const missing = varieties.length - withSoil.length;
+      if (missing > 0) {
+        ignored.push(`${L.soilLabel} : ${missing} ${L.varietiesWithoutData}`);
+      }
     } else {
-      ignored.push(`sol : ${L.notAvailableCriteria}`);
+      ignored.push(`${L.soilLabel} : ${L.notAvailableCriteria}`);
     }
   }
 
@@ -1196,9 +1236,9 @@ function filteredListAnswer(
     const structured = varieties.some((variety) => variety.usages_alimentaires.trim());
 
     list = list.filter((variety) => {
-      if (structured) {
-        return normalize(variety.usages_alimentaires).includes(usage);
-      }
+      const stored = normalize(variety.usages_alimentaires);
+      if (stored) return matchesUsage(stored, usage);
+
       // Repli sur les textes disponibles (description, type, grain) quand le
       // champ structuré est vide. On ne devine rien : seuls les mots présents
       // dans la fiche sont utilisés.
@@ -1209,20 +1249,14 @@ function filteredListAnswer(
           variety.caracteristiques_grain,
         ].join(" ")
       );
-      if (usage === "biofortifie") {
-        return haystack.includes("biofortifie");
-      }
-      if (usage === "fourrage") {
-        return (
-          haystack.includes("fourrage") ||
-          haystack.includes("double usage") ||
-          haystack.includes("paille")
-        );
-      }
-      return haystack.includes("alimentation") || haystack.includes("consommation");
+      return descriptionMatchesUsage(haystack, usage);
     });
 
-    applied.push(`${L.usageFilter} : ${usageDisplay(usage, lang)}`);
+    applied.push(
+      `${L.usageFilter} : ${usageDisplay(usage, lang)}${
+        structured ? "" : ` (${L.inferredFromDescriptions})`
+      }`
+    );
   }
 
   let zones: { variety_id: number; zone_type: ZoneAdaptationType }[] = [];
