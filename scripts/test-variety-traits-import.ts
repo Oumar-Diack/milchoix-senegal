@@ -2,6 +2,7 @@
 // mémoire : aucun accès à data/milchoix.db, aucune écriture réelle.
 
 import { DatabaseSync } from "node:sqlite";
+import { decodeCsvBuffer } from "../lib/csv-parse";
 import {
   buildTraitsTemplate,
   importVarietyTraitsCSV,
@@ -171,22 +172,35 @@ function readRow(db: DatabaseSync, id: number) {
   );
 }
 
-// 8. Vocabulaire d'usage inconnu : avertissement, valeur conservée.
+// 8. Usage libre reconnu : pas d'avertissement, valeur conservée telle quelle.
 {
   const db = createDatabase();
   const csv = [
     "nom_officiel;usages_alimentaires",
-    'Souna 3;"couscous; biere"',
+    'Souna 3;"Couscous (Thiéré), Bouillies (Lakh, Fondé, Rouye), Pâtes et Galettes, Thiakry"',
   ].join("\n");
+  const result = importVarietyTraitsCSV(db, csv, { apply: true });
+  check("usage libre reconnu sans avertissement", result.warnings.length === 0);
+  check(
+    "valeur libre enregistrée telle quelle",
+    readRow(db, 1).usages_alimentaires ===
+      "Couscous (Thiéré), Bouillies (Lakh, Fondé, Rouye), Pâtes et Galettes, Thiakry"
+  );
+}
+
+// 9. Usage hors vocabulaire : avertissement, valeur conservée.
+{
+  const db = createDatabase();
+  const csv = ["nom_officiel;usages_alimentaires", 'Souna 3;"biere, soda"'].join("\n");
   const result = importVarietyTraitsCSV(db, csv, { apply: true });
   check("usage hors vocabulaire averti", result.warnings.length === 1);
   check(
     "valeur tout de même enregistrée",
-    readRow(db, 1).usages_alimentaires === "couscous; biere"
+    readRow(db, 1).usages_alimentaires === "biere, soda"
   );
 }
 
-// 9. Alias ambigu : refus plutôt que mauvaise fiche.
+// 10. Alias ambigu : refus plutôt que mauvaise fiche.
 {
   const db = createDatabase();
   db.prepare(
@@ -249,6 +263,45 @@ function readRow(db: DatabaseSync, id: number) {
       lines[0].includes("rendement_observe_moyen_kg")
   );
   check("modèle : échappement des points-virgules", csv.includes('"'));
+}
+
+// 14. Décodage des CSV exportés par un tableur.
+{
+  const utf8 = decodeCsvBuffer(new Uint8Array(Buffer.from("Thiéré;1 500", "utf8")));
+  check("décodage UTF-8", utf8.encoding === "utf-8" && utf8.text === "Thiéré;1 500");
+
+  const macBytes = Uint8Array.from([0x54, 0x68, 0x69, 0x8e, 0x72, 0x8e]);
+  const mac = decodeCsvBuffer(macBytes);
+  check("décodage Mac Roman", mac.encoding === "macintosh" && mac.text === "Thiéré");
+
+  const cpBytes = Uint8Array.from([0x54, 0x68, 0x69, 0xe9, 0x72, 0xe9]);
+  const cp = decodeCsvBuffer(cpBytes);
+  check(
+    "décodage Windows-1252",
+    cp.encoding === "windows-1252" && cp.text === "Thiéré"
+  );
+
+  const forced = decodeCsvBuffer(macBytes, "windows-1252");
+  check("encodage forcé respecté", forced.encoding === "windows-1252");
+}
+
+// 15. Nom de variété dont la ponctuation a été altérée par l'encodage.
+{
+  const db = createDatabase();
+  db.prepare(
+    "INSERT INTO varieties (id, nom_officiel, noms_locaux) VALUES (?, ?, ?)"
+  ).run(6, "TAAW (ICMH 177090 × SL175)", "TAAW");
+
+  const csv = [
+    "nom_officiel;rendement_observe_moyen_kg",
+    "TAAW (ICMH 177090 √ó SL175);3200",
+  ].join("\n");
+  const result = importVarietyTraitsCSV(db, csv, { apply: true });
+  check(
+    "nom tolérant à la ponctuation",
+    result.updated === 1 && result.errors.length === 0
+  );
+  check("rendement appliqué", readRow(db, 6).rendement_observe_moyen_kg === 3200);
 }
 
 console.log(`\n${checks} contrôles — ${failures === 0 ? "tout passe" : `${failures} échec(s)`}`);

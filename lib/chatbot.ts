@@ -1259,11 +1259,13 @@ function filteredListAnswer(
 
     list = list.filter((variety) => {
       const stored = normalize(variety.usages_alimentaires);
-      if (stored) return matchesUsage(stored, usage);
+      if (stored && matchesUsage(stored, usage)) return true;
 
-      // Repli sur les textes disponibles (description, type, grain) quand le
-      // champ structuré est vide. On ne devine rien : seuls les mots présents
-      // dans la fiche sont utilisés.
+      // Repli sur les textes disponibles (description, type, grain). On ne
+      // devine rien : seuls les mots présents dans la fiche sont utilisés.
+      // L'union avec le champ structuré évite qu'une donnée incomplète (par
+      // exemple « biofortifié » absent des usages) masque une variété qui
+      // est pourtant décrite comme telle.
       const haystack = normalize(
         [
           variety.description,

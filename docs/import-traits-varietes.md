@@ -25,6 +25,28 @@ remplir.
 > Le fichier est en UTF-8 avec séparateur `;`, ouvrable directement dans Excel
 > ou LibreOffice. Évitez d'enregistrer en `.xls` : réexportez en CSV.
 
+Après un import, relancer `--modele` régénère un fichier propre en UTF-8 à
+partir de la base (utile si le tableur a changé l'encodage).
+
+### Encodage
+
+Le fichier est lu en UTF-8 en priorité. S'il ne l'est pas, l'outil compare
+**Mac Roman** et **Windows-1252** (les deux encodages que produisent le plus
+souvent les tableurs) et affiche celui qu'il a retenu :
+
+```text
+Fichier : …/modele-traits-varietes.csv (encodage macintosh)
+```
+
+Un encodage peut être forcé en cas de doute :
+
+```bash
+npm run data:traits -- --file mon-fichier.csv --encoding windows-1252
+```
+
+Si des caractères semblent abîmés dans l'aperçu, corrigez l'encodage avant
+d'utiliser `--apply`.
+
 ## 2. Remplir les trois colonnes
 
 Seules ces colonnes sont lues :
@@ -158,12 +180,16 @@ quelles variétés pour le fourrage ?
 
 ## Règles de correspondance des variétés
 
-Le nom est comparé sans tenir compte de la casse ni des accents. Sont acceptés :
+Le nom est comparé sans tenir compte de la casse, des accents ni de la
+ponctuation. Sont acceptés :
 
 - le nom officiel (`Souna Saloum (SL28)`) ;
 - le nom sans parenthèses (`Souna Saloum`) ;
 - le contenu des parenthèses (`SL28`, `SL 28`) ;
 - les noms locaux renseignés dans le catalogue.
+
+La ponctuation est ignorée : un nom dont le `×` a été abîmé par un tableur
+(`TAAW (ICMH 177090 √ó SL175)`) reste reconnu.
 
 Si deux variétés partagent un alias, la ligne est refusée (« nom ambigu »)
 plutôt que de risquer de modifier la mauvaise fiche.
@@ -175,3 +201,6 @@ plutôt que de risquer de modifier la mauvaise fiche.
   jour et le journal d'audit gardent la trace de l'import.
 - Les valeurs sont importées telles quelles : la validation métier (cohérence
   agronomique) reste de votre responsabilité.
+- Après un import, reporter les valeurs dans `lib/seed-data.ts` pour qu'un
+  reseed ou une nouvelle installation les conserve (elles sont déjà présentes
+  pour les 13 variétés actuelles).

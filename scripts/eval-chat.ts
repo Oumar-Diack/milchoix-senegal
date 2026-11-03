@@ -124,14 +124,14 @@ const cases: EvalCase[] = [
     question: "et son rendement ?",
     lang: "fr",
     after: "cycle-souna3",
-    includes: ["Souna 3", "Rendement potentiel", "non renseigné"],
+    includes: ["Souna 3", "Rendement potentiel", "Rendement observé moyen : 2500 kg/ha"],
     expectContext: { field: "rendement" },
   },
   {
     name: "rendement-chakti",
     question: "rendement de CHAKTI",
     lang: "fr",
-    includes: ["CHAKTI", "kg/ha"],
+    includes: ["CHAKTI", "1500 kg/ha"],
   },
   {
     name: "variete-commune",
@@ -203,7 +203,7 @@ const cases: EvalCase[] = [
     name: "biofortifie",
     question: "quelles variétés biofortifiées ?",
     lang: "fr",
-    includes: ["CHAKTI", "usages : biofortifié", "déduits des descriptions"],
+    includes: ["CHAKTI", "usages : biofortifié"],
     notIncludes: ["Gawane"],
   },
   {
@@ -216,13 +216,14 @@ const cases: EvalCase[] = [
     name: "couscous",
     question: "variétés pour le couscous",
     lang: "fr",
-    includes: ["usages", "déduits des descriptions"],
+    includes: ["usages : grain", "Souna 3"],
   },
   {
     name: "sol-sableux",
     question: "quelle variété pour un sol sableux ?",
     lang: "fr",
-    includes: ["exigences de sol ne sont pas renseignées"],
+    includes: ["Critères appliqués", "sol : sable", "Souna 3"],
+    notIncludes: ["ne sont pas renseignées"],
   },
   {
     name: "varietes-tardives",

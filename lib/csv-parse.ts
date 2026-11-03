@@ -10,6 +10,57 @@ export function normalizeCsvText(text: string): string {
   return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 }
 
+const LOWER_FRENCH = /[àâäçéèêëîïôöùûüÿœæ]/g;
+const UPPER_FRENCH = /[ÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒÆ]/g;
+const SUSPICIOUS = /[ŽŠšžƒ„…†‡ˆ‰‹›•˜™€]/g;
+
+// Les lettres accentuées minuscules sont fréquentes en français ; les
+// majuscules accentuées et les symboles rares le sont beaucoup moins.
+// Ce score départage les encodages mono-octets (Mac Roman vs Windows-1252)
+// quand aucun n'est déclaré.
+function frenchScore(text: string): number {
+  const lower = text.match(LOWER_FRENCH)?.length ?? 0;
+  const upper = text.match(UPPER_FRENCH)?.length ?? 0;
+  const suspicious = text.match(SUSPICIOUS)?.length ?? 0;
+  return lower * 2 + upper - suspicious;
+}
+
+/**
+ * Décode un CSV en UTF-8, avec repli sur les encodages mono-octets courants
+ * des tableurs (Mac Roman, Windows-1252). Un encodage forcé reste possible
+ * pour les fichiers ambigus.
+ */
+export function decodeCsvBuffer(
+  bytes: Uint8Array,
+  forcedEncoding?: string
+): { text: string; encoding: string } {
+  if (forcedEncoding) {
+    return { text: new TextDecoder(forcedEncoding).decode(bytes), encoding: forcedEncoding };
+  }
+
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), encoding: "utf-8" };
+  } catch {
+    // Fichier non UTF-8 : on compare les deux replis les plus fréquents.
+  }
+
+  const candidates = ["macintosh", "windows-1252"];
+  let best = { text: new TextDecoder("utf-8").decode(bytes), encoding: "utf-8", score: -Infinity };
+
+  for (const encoding of candidates) {
+    let text: string;
+    try {
+      text = new TextDecoder(encoding).decode(bytes);
+    } catch {
+      continue;
+    }
+    const score = frenchScore(text);
+    if (score > best.score) best = { text, encoding, score };
+  }
+
+  return { text: best.text, encoding: best.encoding };
+}
+
 export function detectDelimiter(text: string): string {
   const firstLine = normalizeCsvText(text).split("\n")[0] ?? "";
   const candidates = [";", ",", "\t"];

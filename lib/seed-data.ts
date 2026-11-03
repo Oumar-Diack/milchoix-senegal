@@ -14,14 +14,24 @@ export interface VarietySeed {
   reaction_ravageurs: string;
   rendement_potentiel_min_kg: number | null;
   rendement_potentiel_max_kg: number | null;
+  rendement_observe_moyen_kg: number | null;
   caracteristiques_grain: string;
+  usages_alimentaires: string;
+  exigences_pedologiques: string;
   disponibilite_semences: string;
   description: string;
   source: string;
   statut_validation: string;
 }
 
-export const varieties: VarietySeed[] = [
+type VarietySeedBase = Omit<
+  VarietySeed,
+  | "exigences_pedologiques"
+  | "usages_alimentaires"
+  | "rendement_observe_moyen_kg"
+>;
+
+const baseVarieties: VarietySeedBase[] = [
   {
     nom_officiel: "Souna 3",
     noms_locaux: "Souna 3",
@@ -307,5 +317,95 @@ export const varieties: VarietySeed[] = [
     description: "Variété bieofortifié avec une teneur élevé en fer et en zinc, à épis courts et très compacts et à gros grains. Tolérante au mildiou et à la secheresse",
     source: "Catalogue Régional des Espèces et Variétés Végétales CEDEAO-UEMOA-CILSS",
     statut_validation: "officiel",
-  }
+  },
 ];
+
+// Caractéristiques saisies dans data/modele-traits-varietes.csv puis
+// importées en base. Elles sont dupliquées ici pour survivre à un reseed et
+// être présentes sur toute nouvelle installation.
+const SOIL_ALL = "Sols sableux (Dior), Sols sablo-argileux (Dior-Deck)";
+const USAGES_GRAIN =
+  "Couscous (Thiéré), Bouillies (Lakh, Fondé, Rouye), Pâtes et Galettes, Thiakry";
+const USAGES_GRAIN_FOURRAGE = `${USAGES_GRAIN}, Fourrage`;
+
+type VarietyTraits = Pick<
+  VarietySeed,
+  "exigences_pedologiques" | "usages_alimentaires" | "rendement_observe_moyen_kg"
+>;
+
+const varietyTraits: Record<string, VarietyTraits> = {
+  "Souna 3": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2500,
+  },
+  "IBV 8001": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2250,
+  },
+  "IBV 8004": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2250,
+  },
+  "IBMV 8402": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2000,
+  },
+  "ISMI 9507": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2500,
+  },
+  Gawane: {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2500,
+  },
+  "Thialack 2": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2500,
+  },
+  "Souna Saloum (SL28)": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN_FOURRAGE,
+    rendement_observe_moyen_kg: 2500,
+  },
+  "Souna Sine (SL169)": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN_FOURRAGE,
+    rendement_observe_moyen_kg: 3000,
+  },
+  "Souna Baol (SL423)": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN_FOURRAGE,
+    rendement_observe_moyen_kg: 2750,
+  },
+  "TAAW (ICMH 177090 × SL175)": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 3850,
+  },
+  "SOSAT-C88": {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 2500,
+  },
+  CHAKTI: {
+    exigences_pedologiques: SOIL_ALL,
+    usages_alimentaires: USAGES_GRAIN,
+    rendement_observe_moyen_kg: 1500,
+  },
+};
+
+export const varieties: VarietySeed[] = baseVarieties.map((variety) => ({
+  ...variety,
+  ...(varietyTraits[variety.nom_officiel] ?? {
+    exigences_pedologiques: "",
+    usages_alimentaires: "",
+    rendement_observe_moyen_kg: null,
+  }),
+}));

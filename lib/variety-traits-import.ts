@@ -99,8 +99,15 @@ const USAGE_VOCABULARY = new Set([
   "latchiri",
   "sankhal",
   "bouillie",
+  "bouillies",
+  "lakh",
+  "fonde",
+  "rouye",
+  "thiakry",
   "semoule",
   "farine",
+  "pates",
+  "galettes",
   "fourrage",
   "fan",
   "paille",
@@ -127,15 +134,31 @@ function buildColumnMap(headers: string[]): Map<string, number> {
   return map;
 }
 
+/** Clé de variété : casse, accents et ponctuation ignorés. */
+function canonicalVarietyName(value: string): string {
+  return normalizeKey(value).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/**
+ * Variante tolérante : un caractère isolé issu d'un encodage abîmé
+ * (« √ó » pour « × ») ne doit pas empêcher la reconnaissance du nom.
+ * Les chiffres isolés sont conservés (« Souna 3 »).
+ */
+function relaxedVarietyName(canonical: string): string {
+  return canonical
+    .split(" ")
+    .filter((token) => token.length > 1 || /^[0-9]+$/.test(token))
+    .join(" ");
+}
+
 /** Casse et accents ignorés, espaces et parenthèses tolérés. */
 function varietyKeys(variety: VarietyRow): string[] {
   const keys = new Set<string>();
   const add = (value: string) => {
-    const normalized = normalizeKey(value);
-    if (normalized) {
-      keys.add(normalized);
-      keys.add(normalized.replace(/\s+/g, ""));
-    }
+    const normalized = canonicalVarietyName(value);
+    if (!normalized) return;
+    keys.add(normalized);
+    keys.add(normalized.replace(/\s+/g, ""));
   };
 
   add(variety.nom_officiel);
@@ -150,8 +173,12 @@ function varietyKeys(variety: VarietyRow): string[] {
   return [...keys];
 }
 
-function parseYield(raw: string): { value: number | null; error?: string } {
-  const compact = raw.replace(/\u00a0/g, " ").replace(/\s+/g, "");
+/** Espaces multiples et espaces de bord ramenés à une forme propre. */
+function cleanText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function parseYield(raw: string): { value: number | null; error?: string } {  const compact = raw.replace(/\u00a0/g, " ").replace(/\s+/g, "");
   if (!compact) return { value: null };
 
   const match = /^([0-9]+(?:[.,][0-9]+)?)(kg|kgs|t|tonne|tonnes)?(?:\/ha)?$/i.exec(compact);
@@ -176,16 +203,19 @@ function soilWarning(value: string): string | null {
   return `Sol sans texture reconnue (${SOIL_HINT}) : la valeur est enregistrée mais le filtre sol du chat ne la reconnaîtra pas.`;
 }
 
+function hasWord(text: string, word: string): boolean {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(text);
+}
+
+// Un usage libre (« Couscous (Thiéré), Bouillies… ») est valide dès qu'un
+// terme du vocabulaire y figure : on ne découpe pas la valeur sur les virgules,
+// qui séparent aussi les précisions entre parenthèses.
 function usageWarnings(value: string): string[] {
-  const tokens = value
-    .split(/[;|,]/)
-    .map((token) => normalizeKey(token))
-    .filter(Boolean);
-  if (tokens.length === 0) return [];
-  const unknown = tokens.filter((token) => !USAGE_VOCABULARY.has(token));
-  if (unknown.length === 0) return [];
+  const normalized = normalizeKey(value);
+  if ([...USAGE_VOCABULARY].some((term) => hasWord(normalized, term))) return [];
   return [
-    `Usage(s) hors vocabulaire : ${unknown.join(", ")}. Vocabulaire reconnu : ${[
+    `Aucun usage reconnu dans « ${value} ». Vocabulaire : ${[
       ...USAGE_VOCABULARY,
     ].join(", ")}.`,
   ];
@@ -309,9 +339,22 @@ export function importVarietyTraitsCSV(
         continue;
       }
 
-      const key = normalizeKey(name);
-      const compactKey = key.replace(/\s+/g, "");
-      const variety = byKey.has(key) ? byKey.get(key) : byKey.get(compactKey);
+      const strictKey = canonicalVarietyName(name);
+      const relaxedKey = relaxedVarietyName(strictKey);
+      const candidates = [
+        strictKey,
+        strictKey.replace(/\s+/g, ""),
+        relaxedKey,
+        relaxedKey.replace(/\s+/g, ""),
+      ];
+
+      let variety: VarietyRow | null | undefined;
+      for (const candidate of candidates) {
+        if (byKey.has(candidate)) {
+          variety = byKey.get(candidate);
+          break;
+        }
+      }
 
       if (variety === undefined) {
         result.errors.push({
@@ -347,13 +390,15 @@ export function importVarietyTraitsCSV(
       }
 
       if (rawSoil) {
-        after.exigences_pedologiques = rawSoil;
-        const warning = soilWarning(rawSoil);
+        const soil = cleanText(rawSoil);
+        after.exigences_pedologiques = soil;
+        const warning = soilWarning(soil);
         if (warning) result.warnings.push({ row: rowNumber, message: warning });
       }
       if (rawUsages) {
-        after.usages_alimentaires = rawUsages;
-        for (const warning of usageWarnings(rawUsages)) {
+        const usages = cleanText(rawUsages);
+        after.usages_alimentaires = usages;
+        for (const warning of usageWarnings(usages)) {
           result.warnings.push({ row: rowNumber, message: warning });
         }
       }

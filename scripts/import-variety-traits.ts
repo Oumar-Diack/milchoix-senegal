@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { ensureDatabase } from "../lib/ensure-db";
 import { getDb } from "../lib/db";
+import { decodeCsvBuffer } from "../lib/csv-parse";
 import { logAudit } from "../lib/queries";
 import {
   buildTraitsTemplate,
@@ -26,6 +27,7 @@ interface Args {
   force: boolean;
   help: boolean;
   file: string | null;
+  encoding: string | null;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -35,6 +37,7 @@ function parseArgs(argv: string[]): Args {
     force: false,
     help: false,
     file: null,
+    encoding: null,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -45,6 +48,8 @@ function parseArgs(argv: string[]): Args {
     else if (arg === "--help" || arg === "-h") args.help = true;
     else if (arg === "--file") args.file = argv[++i] ?? null;
     else if (arg.startsWith("--file=")) args.file = arg.slice("--file=".length);
+    else if (arg === "--encoding") args.encoding = argv[++i] ?? null;
+    else if (arg.startsWith("--encoding=")) args.encoding = arg.slice("--encoding=".length);
     else {
       console.error(`Option inconnue : ${arg}`);
       args.help = true;
@@ -67,11 +72,16 @@ Usage :
       Écrit en base (refusé si le fichier contient une erreur).
 
 Options :
-  --modele        génère ${DEFAULT_FILE}
-  --file <path>   fichier à importer
-  --apply         écrit réellement en base
-  --force         écrit malgré les erreurs de lignes (déconseillé)
-  --help          affiche cette aide
+  --modele          génère ${DEFAULT_FILE}
+  --file <path>     fichier à importer
+  --apply           écrit réellement en base
+  --force           écrit malgré les erreurs de lignes (déconseillé)
+  --encoding <enc>  force l'encodage (utf-8, macintosh, windows-1252…)
+  --help            affiche cette aide
+
+Encodage :
+  UTF-8 est détecté automatiquement ; à défaut, Mac Roman et Windows-1252
+  sont comparés (les CSV exportés par un tableur ne sont pas toujours UTF-8).
 
 Règles :
   - une cellule vide ne modifie rien ;
@@ -131,14 +141,19 @@ function main(): void {
 
   const file = resolve(args.file ?? DEFAULT_FILE);
   let text: string;
+  let encoding: string;
   try {
-    text = readFileSync(file, "utf8");
+    const decoded = decodeCsvBuffer(readFileSync(file), args.encoding ?? undefined);
+    text = decoded.text;
+    encoding = decoded.encoding;
   } catch {
     console.error(`Fichier introuvable : ${file}`);
     console.error("Générez d'abord le modèle : npm run data:traits -- --modele");
     process.exitCode = 1;
     return;
   }
+
+  console.log(`Fichier : ${file} (encodage ${encoding})`);
 
   if (args.apply && !args.force) {
     const preview = importVarietyTraitsCSV(db, text, { apply: false });
