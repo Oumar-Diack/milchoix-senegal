@@ -3,7 +3,61 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-type Tab = "varietes" | "zones" | "communes" | "climat" | "retours" | "journal";
+type Tab = "varietes" | "zones" | "communes" | "climat" | "retours" | "journal" | "chat";
+
+interface UnansweredQuestion {
+  key: string;
+  message: string;
+  language: string;
+  count: number;
+  lastSeen: string;
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  fr: "Français",
+  en: "English",
+  wo: "Wolof",
+};
+
+// Regroupe les questions restées sans réponse (action `chat_unanswered`) pour
+// montrer ce qui manque réellement au moteur, par ordre de fréquence.
+function parseUnanswered(audit: Record<string, unknown>[]): UnansweredQuestion[] {
+  const grouped = new Map<string, UnansweredQuestion>();
+
+  for (const entry of audit) {
+    if (entry.action !== "chat_unanswered") continue;
+
+    let message = "";
+    let language = "";
+    try {
+      const details = JSON.parse(String(entry.details ?? "{}")) as {
+        message?: unknown;
+        language?: unknown;
+      };
+      message = typeof details.message === "string" ? details.message : "";
+      language = typeof details.language === "string" ? details.language : "";
+    } catch {
+      message = String(entry.details ?? "");
+    }
+
+    const trimmed = message.trim();
+    if (!trimmed) continue;
+
+    const key = trimmed.toLowerCase();
+    const createdAt = String(entry.created_at ?? "");
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (createdAt > existing.lastSeen) existing.lastSeen = createdAt;
+    } else {
+      grouped.set(key, { key, message: trimmed, language, count: 1, lastSeen: createdAt });
+    }
+  }
+
+  return [...grouped.values()].sort(
+    (a, b) => b.count - a.count || b.lastSeen.localeCompare(a.lastSeen)
+  );
+}
 
 interface OverviewData {
   varieties: Record<string, unknown>[];
@@ -420,8 +474,12 @@ export function AdminDashboard({ username }: { username: string }) {
     { key: "communes", label: "Communes" },
     { key: "climat", label: "Climat" },
     { key: "retours", label: "Retours utilisateurs" },
+    { key: "chat", label: "Questions sans réponse" },
     { key: "journal", label: "Journal" },
   ];
+
+  const unanswered = data ? parseUnanswered(data.audit) : [];
+  const unansweredOccurrences = unanswered.reduce((total, item) => total + item.count, 0);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -1022,6 +1080,49 @@ export function AdminDashboard({ username }: { username: string }) {
                         <span className="text-stone-400 text-xs">{String(f.created_at)}</span>
                       </div>
                       {Boolean(f.commentaire) && <p className="mt-2 text-stone-600">« {String(f.commentaire)} »</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {tab === "chat" && (
+            <div className="rounded-xl border border-stone-200 bg-white">
+              <div className="border-b border-stone-100 p-4">
+                <h2 className="font-semibold text-mil-900">Questions sans réponse</h2>
+                <p className="mt-1 text-sm text-stone-500">
+                  Questions pour lesquelles le chat a répondu par un refus explicite.
+                  Elles indiquent les données ou formulations à couvrir en priorité
+                  (sur les 200 dernières entrées du journal).
+                </p>
+                {unanswered.length > 0 && (
+                  <p className="mt-2 text-sm text-stone-600">
+                    {unanswered.length} question{unanswered.length > 1 ? "s" : ""} distincte
+                    {unanswered.length > 1 ? "s" : ""} · {unansweredOccurrences} occurrence
+                    {unansweredOccurrences > 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+              {unanswered.length === 0 ? (
+                <p className="p-6 text-stone-500">
+                  Aucune question sans réponse enregistrée. Le chat a répondu à partir
+                  des données de la plateforme sur toutes les questions récentes.
+                </p>
+              ) : (
+                <ul className="divide-y divide-stone-100">
+                  {unanswered.map((item) => (
+                    <li key={item.key} className="flex items-start gap-3 p-4 text-sm">
+                      <span className="mt-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        ×{item.count}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-stone-800">« {item.message} »</p>
+                        <p className="mt-1 text-xs text-stone-400">
+                          {LANGUAGE_LABELS[item.language] || item.language || "Langue inconnue"}
+                          {item.lastSeen ? ` · ${item.lastSeen}` : ""}
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>
