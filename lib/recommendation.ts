@@ -262,21 +262,27 @@ export function scoreVariety(
   }
 
   // 3. Risque de séquences sèches
+  // Avec les données mensuelles réelles (WorldClim), « dureeMaxSec » n'est pas
+  // disponible : on se rabat sur le nombre de mois secs en cœur de saison (>= 4).
   const risqueSec =
-    nbSec != null && dureeMaxSec != null && (nbSec >= 4 || dureeMaxSec >= 15);
+    nbSec != null && (nbSec >= 4 || (dureeMaxSec != null && dureeMaxSec >= 15));
   if (exclusion == null && risqueSec) {
+    const secDetail =
+      dureeMaxSec != null
+        ? `${nbSec} épisodes, jusqu'à ${dureeMaxSec} j`
+        : `${nbSec} mois secs en cœur de saison`;
     if (tol >= 2) {
       score += 15;
       raisons.push({
         critere: "Séquences sèches",
-        message: `Risque élevé de séquences sèches (${nbSec} épisodes, jusqu'à ${dureeMaxSec} j) : la tolérance à la sécheresse de la variété est un atout.`,
+        message: `Risque élevé de séquences sèches (${secDetail}) : la tolérance à la sécheresse de la variété est un atout.`,
         type: "positif",
       });
     } else {
       score -= 15;
       raisons.push({
         critere: "Séquences sèches",
-        message: `Risque élevé de séquences sèches (${nbSec} épisodes, jusqu'à ${dureeMaxSec} j) et tolérance limitée de la variété.`,
+        message: `Risque élevé de séquences sèches (${secDetail}) et tolérance limitée de la variété.`,
         type: "negatif",
       });
     }

@@ -51,23 +51,7 @@ export function seedAll(db: DatabaseSync, options: { reset?: boolean } = {}): vo
     communeIdByName.set(c.nom, Number(res.lastInsertRowid));
   }
 
-  const insertClimat = db.prepare(`
-    INSERT INTO climat (
-      commune_id, annee, cumul_pluvio_mm, date_debut_saison, date_fin_saison,
-      duree_saison_jours, nb_sequences_seches, duree_max_seche_jours,
-      temperature_moyenne_c, prevision_saison, source
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'donnees exemple')
-  `);
-
-  for (const cl of climats) {
-    const cid = communeIdByName.get(cl.commune);
-    if (!cid) continue;
-    insertClimat.run(
-      cid, cl.annee, cl.cumul_pluvio_mm, cl.date_debut_saison, cl.date_fin_saison,
-      cl.duree_saison_jours, cl.nb_sequences_seches, cl.duree_max_seche_jours,
-      cl.temperature_moyenne_c, cl.prevision_saison
-    );
-  }
+  insertClimats(db, communeIdByName);
 
   const insertZone = db.prepare(`
     INSERT OR IGNORE INTO variety_zones (variety_id, commune_id, zone_type, source, niveau_confiance)
@@ -101,4 +85,38 @@ export function seedAll(db: DatabaseSync, options: { reset?: boolean } = {}): vo
     );
     console.log("Utilisateur admin par défaut créé (voir MILCHOIX_ADMIN_USERNAME / MILCHOIX_ADMIN_PASSWORD).");
   }
+}
+
+// Source des données climatiques réelles (voir Donnees_climatiques/METHODOLOGIE.md).
+export const CLIMAT_SOURCE = "WorldClim wc2.1_cruts4.09 (1951-2024)";
+
+function insertClimats(db: DatabaseSync, communeIdByName: Map<string, number>): void {
+  const insertClimat = db.prepare(`
+    INSERT INTO climat (
+      commune_id, annee, cumul_pluvio_mm, date_debut_saison, date_fin_saison,
+      duree_saison_jours, nb_sequences_seches, duree_max_seche_jours,
+      temperature_moyenne_c, prevision_saison, source
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const cl of climats) {
+    const cid = communeIdByName.get(cl.commune);
+    if (!cid) continue;
+    insertClimat.run(
+      cid, cl.annee, cl.cumul_pluvio_mm, cl.date_debut_saison, cl.date_fin_saison,
+      cl.duree_saison_jours, cl.nb_sequences_seches, cl.duree_max_seche_jours,
+      cl.temperature_moyenne_c, cl.prevision_saison, CLIMAT_SOURCE
+    );
+  }
+}
+
+// Remplace l'intégralité des données climatiques (utilisé pour migrer la base
+// existante vers les données réelles sans toucher aux autres tables).
+export function replaceClimat(db: DatabaseSync): void {
+  const rows = db.prepare("SELECT id, nom FROM communes").all() as { id: number; nom: string }[];
+  const communeIdByName = new Map<string, number>();
+  for (const r of rows) communeIdByName.set(r.nom, r.id);
+
+  db.exec("DELETE FROM climat;");
+  insertClimats(db, communeIdByName);
 }

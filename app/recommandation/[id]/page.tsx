@@ -88,7 +88,9 @@ export default async function RecommendationPage({
           <div>
             <dt className="text-stone-400 text-xs">Séquences sèches</dt>
             <dd className="font-medium">
-              {climat.nb_sequences_seches} (max {climat.duree_max_seche_jours} j)
+              {climat.duree_max_seche_jours != null
+                ? `${climat.nb_sequences_seches} (max ${climat.duree_max_seche_jours} j)`
+                : `${climat.nb_sequences_seches} mois secs (cœur de saison)`}
             </dd>
           </div>
           <div>

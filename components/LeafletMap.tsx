@@ -20,15 +20,15 @@ interface Zone {
 }
 
 const ZONE_COLORS: Record<string, string> = {
-  officielle: "#389139",
-  historique: "#2563eb",
-  potentielle: "#f59e0b",
+  adaptee: "#389139",
+  marginale: "#f59e0b",
+  non_adaptee: "#9ca3af",
 };
 
 const ZONE_NAMES: Record<string, string> = {
-  officielle: "Zone officielle",
-  historique: "Zone historique",
-  potentielle: "Zone potentielle",
+  adaptee: "Zone adaptée",
+  marginale: "Zone marginale",
+  non_adaptee: "Non adaptée",
 };
 
 function pluvioColor(mm: number): string {
@@ -41,9 +41,9 @@ function pluvioColor(mm: number): string {
 }
 
 const ZONE_PRIORITY: Record<string, number> = {
-  officielle: 0,
-  historique: 1,
-  potentielle: 2,
+  adaptee: 0,
+  marginale: 1,
+  non_adaptee: 2,
 };
 
 function formatSurface(km2: number): string {
@@ -273,20 +273,22 @@ export default function LeafletMap({
                       {regionCommunes.length > 0 && (
                         <ul className="mt-2 space-y-1">
                           {regionCommunes.map((c) => {
-                            const zt = varietyId
+                            const z = varietyId
                               ? zones.find(
                                   (z) => z.variety_id === varietyId && z.commune_id === c.id
-                                )?.zone_type
+                                )
                               : undefined;
                             return (
                               <li key={c.id} className="flex items-center gap-2">
                                 <span
                                   className="inline-block h-2 w-2 rounded-full"
-                                  style={{ backgroundColor: zt ? ZONE_COLORS[zt] : "#d6d3d1" }}
+                                  style={{ backgroundColor: z ? ZONE_COLORS[z.zone_type] : "#d6d3d1" }}
                                 />
                                 {c.nom}
-                                {zt && (
-                                  <span className="text-stone-400 text-xs">({ZONE_NAMES[zt]})</span>
+                                {z && (
+                                  <span className="text-stone-400 text-xs">
+                                    ({ZONE_NAMES[z.zone_type]})
+                                  </span>
                                 )}
                               </li>
                             );

@@ -15,7 +15,11 @@ const LeafletMap = dynamic(() => import("./LeafletMap"), {
 export function VarietyMap(props: {
   communes: Commune[];
   varieties: Variety[];
-  zones: { variety_id: number; commune_id: number; zone_type: string }[];
+  zones: {
+    variety_id: number;
+    commune_id: number;
+    zone_type: string;
+  }[];
   climats: Climat[];
   initialVariety: number | null;
   initialYear: number;

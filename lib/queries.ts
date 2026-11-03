@@ -2,6 +2,7 @@ import { ensureDatabase } from "./ensure-db";
 import { getDb } from "./db";
 import type { Variety, Commune, Climat, Preferences } from "./types";
 import { scoreVariety, sortResults, type VarietyResult } from "./recommendation";
+import { zonesAdaptation } from "./zones-adaptation";
 import { pluvioAnnuelle } from "./isohyetes";
 
 function db() {
@@ -85,6 +86,123 @@ export function getAllZones(): { variety_id: number; commune_id: number; zone_ty
       .prepare("SELECT variety_id, commune_id, zone_type FROM variety_zones")
       .all() as unknown as { variety_id: number; commune_id: number; zone_type: string }[]
   );
+}
+
+// Zones d'adaptation des variétés, issues du fichier de référence
+// « Zones d'adaptation.xlsx » : pour chaque variété, les communes « adaptées »
+// et « marginales ». Les communes non listées sont considérées non adaptées.
+export type ZoneAdaptationType = "adaptee" | "marginale" | "non_adaptee";
+
+export function getAdaptationZones(): {
+  variety_id: number;
+  commune_id: number;
+  zone_type: ZoneAdaptationType;
+}[] {
+  const varieties = getVarieties();
+  const communes = getCommunes();
+
+  const varietyIdByName = new Map<string, number>();
+  for (const v of varieties) varietyIdByName.set(v.nom_officiel, v.id);
+  const communeIdByName = new Map<string, number>();
+  for (const c of communes) communeIdByName.set(c.nom, c.id);
+
+  const zones: { variety_id: number; commune_id: number; zone_type: ZoneAdaptationType }[] = [];
+  for (const entry of zonesAdaptation) {
+    const varietyId = varietyIdByName.get(entry.variete);
+    if (varietyId == null) continue;
+    const adaptees = new Set(entry.adaptees);
+    const marginales = new Set(entry.marginales);
+    for (const commune of communes) {
+      const zone_type: ZoneAdaptationType = adaptees.has(commune.nom)
+        ? "adaptee"
+        : marginales.has(commune.nom)
+        ? "marginale"
+        : "non_adaptee";
+      zones.push({ variety_id: varietyId, commune_id: commune.id, zone_type });
+    }
+  }
+  return zones;
+}
+
+// Zones d'adaptation d'une commune : pour chaque variété publiée, indique si
+// elle est « adaptée », « marginale » ou « non adaptée » dans cette commune.
+// Lecture ciblée (13 entrées de référence) plutôt que le produit complet
+// variétés × communes, pour garder le chat réactif.
+export function getCommuneAdaptationZones(
+  communeId: number
+): { variety_id: number; zone_type: ZoneAdaptationType }[] {
+  const commune = getCommune(communeId);
+  if (!commune) return [];
+
+  const byVariety = new Map<string, { adaptees: Set<string>; marginales: Set<string> }>();
+  for (const entry of zonesAdaptation) {
+    byVariety.set(entry.variete, {
+      adaptees: new Set(entry.adaptees),
+      marginales: new Set(entry.marginales),
+    });
+  }
+
+  return getVarieties().map((variety) => {
+    const entry = byVariety.get(variety.nom_officiel);
+    const zone_type: ZoneAdaptationType = entry?.adaptees.has(commune.nom)
+      ? "adaptee"
+      : entry?.marginales.has(commune.nom)
+      ? "marginale"
+      : "non_adaptee";
+    return { variety_id: variety.id, zone_type };
+  });
+}
+
+// Zones d'adaptation d'une variété : listes de communes adaptées / marginales.
+export function getVarietyAdaptation(
+  varietyId: number
+): { adaptees: string[]; marginales: string[] } | null {
+  const variety = getVariety(varietyId);
+  if (!variety) return null;
+  const entry = zonesAdaptation.find((z) => z.variete === variety.nom_officiel);
+  if (!entry) return null;
+  return {
+    adaptees: [...entry.adaptees].sort((a, b) => a.localeCompare(b, "fr")),
+    marginales: [...entry.marginales].sort((a, b) => a.localeCompare(b, "fr")),
+  };
+}
+
+// Normale climatique d'une commune sur une période (par défaut 1991-2020).
+// Agrégation calculée par SQLite : aucun chargement des 74 années en mémoire.
+export interface ClimatNormal {
+  commune_id: number;
+  annee_debut: number;
+  annee_fin: number;
+  nb_annees: number;
+  cumul_mm: number | null;
+  saison_jours: number | null;
+  mois_secs: number | null;
+  temperature_c: number | null;
+}
+
+export function getClimatNormal(
+  communeId: number,
+  anneeDebut = 1991,
+  anneeFin = 2020
+): ClimatNormal | null {
+  const d = db();
+  const row = d
+    .prepare(
+      `SELECT commune_id,
+              MIN(annee) AS annee_debut,
+              MAX(annee) AS annee_fin,
+              COUNT(*) AS nb_annees,
+              AVG(cumul_pluvio_mm) AS cumul_mm,
+              AVG(duree_saison_jours) AS saison_jours,
+              AVG(nb_sequences_seches) AS mois_secs,
+              AVG(temperature_moyenne_c) AS temperature_c
+         FROM climat
+        WHERE commune_id = ? AND annee BETWEEN ? AND ?`
+    )
+    .get(communeId, anneeDebut, anneeFin) as unknown as ClimatNormal | undefined;
+
+  if (!row || !row.nb_annees) return null;
+  return { ...row };
 }
 
 export function getAllClimat(): Climat[] {

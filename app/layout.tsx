@@ -24,8 +24,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <body className="min-h-screen flex flex-col">
+    <html lang="fr" suppressHydrationWarning>
+      <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <header className="sticky top-0 z-40 bg-mil-900 text-white shadow">
           <div className="mx-auto max-w-6xl px-4 flex items-center justify-between h-14">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg">
