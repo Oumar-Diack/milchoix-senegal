@@ -262,16 +262,16 @@ export function scoreVariety(
     });
   }
 
-  // 3. Risque de séquences sèches
-  // Avec les données mensuelles réelles (WorldClim), « dureeMaxSec » n'est pas
-  // disponible : on se rabat sur le nombre de mois secs en cœur de saison (>= 4).
+  // 3. Risque de séquences sèches (valeurs annuelles de la campagne)
+  const hasDryData = nbSec != null || dureeMaxSec != null;
   const risqueSec =
-    nbSec != null && (nbSec >= 4 || (dureeMaxSec != null && dureeMaxSec >= 15));
+    hasDryData &&
+    ((nbSec != null && nbSec >= 4) || (dureeMaxSec != null && dureeMaxSec >= 15));
   if (exclusion == null && risqueSec) {
-    const secDetail =
-      dureeMaxSec != null
-        ? `${nbSec} épisodes, jusqu'à ${dureeMaxSec} j`
-        : `${nbSec} mois secs en cœur de saison`;
+    const details: string[] = [];
+    if (nbSec != null) details.push(`${nbSec} séquence(s) sèche(s)`);
+    if (dureeMaxSec != null) details.push(`jusqu'à ${dureeMaxSec} j`);
+    const secDetail = details.join(", ");
     if (tol >= 2) {
       score += 15;
       raisons.push({
@@ -287,8 +287,14 @@ export function scoreVariety(
         type: "negatif",
       });
     }
-  } else if (exclusion == null && risqueSec === false) {
+  } else if (exclusion == null && hasDryData) {
     score += 5;
+  } else if (exclusion == null) {
+    raisons.push({
+      critere: "Séquences sèches",
+      message: "Données de séquences sèches non disponibles pour cette campagne : critère non évalué.",
+      type: "neutre",
+    });
   }
 
   // 4. Date de semis tardive

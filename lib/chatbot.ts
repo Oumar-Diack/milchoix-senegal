@@ -2,6 +2,7 @@ import {
   getCommunes,
   getVarieties,
   getClimatNormal,
+  getLatestClimat,
   getCommuneAdaptationZones,
   getVarietyAdaptation,
   type ClimatNormal,
@@ -129,7 +130,9 @@ const FR_DATA = {
   rainfall: "Cumul pluviométrique moyen",
   rainfallUnit: "mm/an",
   season: "Durée moyenne de saison",
-  dryMonths: "Mois secs en cœur de saison",
+  dryMonths: "Séquences sèches (moyenne annuelle)",
+  drySpells: "Séquences sèches",
+  campaign: "campagne",
   temperature: "Température moyenne",
   period: "normale",
   years: "ans",
@@ -191,7 +194,9 @@ const EN_DATA: typeof FR_DATA = {
   rainfall: "Mean annual rainfall",
   rainfallUnit: "mm/year",
   season: "Mean season length",
-  dryMonths: "Dry months in mid-season",
+  dryMonths: "Dry spells (annual average)",
+  drySpells: "Dry spells",
+  campaign: "season",
   temperature: "Mean temperature",
   period: "normal",
   years: "years",
@@ -743,20 +748,25 @@ function defaultPreferences(campagneAnnee: number): Preferences {
 
 // Convertit une normale climatique en objet Climat utilisable par le moteur de
 // recommandation (les champs journaliers ne sont pas disponibles).
-function normalToClimat(normal: ClimatNormal): Climat {
+// Les précipitations et la durée de saison restent celles de la normale ; les
+// séquences sèches, elles, viennent de la dernière campagne annuelle réelle :
+// une moyenne 1991-2020 ne peut pas atteindre les seuils annuels du moteur.
+function normalToClimat(normal: ClimatNormal, annual: Climat | null): Climat {
   return {
     id: -1,
     commune_id: normal.commune_id,
-    annee: normal.annee_fin,
+    annee: annual?.annee ?? normal.annee_fin,
     cumul_pluvio_mm: normal.cumul_mm == null ? null : Math.round(normal.cumul_mm),
     date_debut_saison: null,
     date_fin_saison: null,
     duree_saison_jours:
       normal.saison_jours == null ? null : Math.round(normal.saison_jours),
-    nb_sequences_seches: normal.mois_secs == null ? null : Math.round(normal.mois_secs),
-    duree_max_seche_jours: null,
+    nb_sequences_seches: annual?.nb_sequences_seches ?? null,
+    duree_max_seche_jours: annual?.duree_max_seche_jours ?? null,
     temperature_moyenne_c: normal.temperature_c,
-    prevision_saison: `Normale ${normal.annee_debut}-${normal.annee_fin}`,
+    prevision_saison: annual
+      ? `Campagne ${annual.annee}`
+      : `Normale ${normal.annee_debut}-${normal.annee_fin}`,
     source: "WorldClim",
     date_maj: "",
   };
@@ -771,7 +781,8 @@ function recommendationAnswer(
   const normal = getClimatNormal(commune.id);
   if (!normal) return L.noClimate;
 
-  const climat = normalToClimat(normal);
+  const annual = getLatestClimat(commune.id);
+  const climat = normalToClimat(normal, annual);
   const prefs = defaultPreferences(normal.annee_fin);
   const results = sortResults(
     varieties
@@ -800,6 +811,12 @@ function recommendationAnswer(
   if (main) {
     lines.push(`• ${L.mainReason} : ${main.message}`);
   }
+
+  lines.push(
+    annual
+      ? `• ${L.drySpells} : ${annual.nb_sequences_seches ?? "—"} (${L.campaign} ${annual.annee})`
+      : `• ${L.drySpells} : ${L.notProvided}`
+  );
 
   lines.push(L.source);
   return lines.join("\n");

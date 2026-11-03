@@ -210,6 +210,21 @@ export function getAllClimat(): Climat[] {
   return plain(d.prepare("SELECT * FROM climat ORDER BY commune_id, annee").all() as unknown as Climat[]);
 }
 
+/**
+ * Dernière campagne annuelle disponible pour une commune.
+ *
+ * Le chat n'a pas d'année de campagne : pour le critère « séquences sèches »,
+ * on utilise la valeur annuelle réelle la plus récente plutôt que la moyenne
+ * 1991-2020 (qui ne peut pas atteindre les seuils annuels du moteur).
+ */
+export function getLatestClimat(communeId: number): Climat | null {
+  const d = db();
+  const row = d
+    .prepare("SELECT * FROM climat WHERE commune_id = ? ORDER BY annee DESC LIMIT 1")
+    .get(communeId) as unknown as Climat | undefined;
+  return row ? { ...row } : null;
+}
+
 export function getCommunes(): Commune[] {
   const d = db();
   return plain(d.prepare("SELECT * FROM communes ORDER BY nom").all() as unknown as Commune[]);

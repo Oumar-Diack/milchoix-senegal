@@ -100,6 +100,13 @@ const cases: EvalCase[] = [
     notIncludes: ["Je ne dispose pas"],
   },
   {
+    name: "recommandation-kaolack",
+    question: "recommander les meilleures variétés pour Kaolack",
+    lang: "fr",
+    includes: ["Recommandation pour Kaolack", "Séquences sèches", "campagne"],
+    notIncludes: ["Je ne dispose pas"],
+  },
+  {
     name: "tolerance-secheresse",
     question: "variétés tolérantes à la sécheresse",
     lang: "fr",
