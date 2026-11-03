@@ -1,116 +1,279 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 interface Message {
+  id: number;
   role: "user" | "assistant";
   text: string;
 }
 
 const LANG_LABELS: Record<string, string> = { fr: "Français", en: "English", wo: "Wolof" };
 
+const MAX_MESSAGES = 60;
+
+// Bulle mémorisée : seules les bulles dont le texte change sont re-rendues
+// pendant le streaming (les messages précédents restent stables).
+const MessageBubble = memo(function MessageBubble({
+  role,
+  text,
+  streaming,
+}: {
+  role: "user" | "assistant";
+  text: string;
+  streaming: boolean;
+}) {
+  return (
+    <div className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[80%] whitespace-pre-line px-3 py-2 rounded-2xl text-sm ${
+          role === "user"
+            ? "bg-mil-700 text-white rounded-br-sm"
+            : "bg-stone-100 text-stone-800 rounded-bl-sm"
+        }`}
+      >
+        {text}
+        {streaming && (
+          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-stone-400 align-text-bottom" />
+        )}
+      </div>
+    </div>
+  );
+});
+
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [lang, setLang] = useState<string>("auto");
   const [messages, setMessages] = useState<Message[]>([
     {
+      id: 0,
       role: "assistant",
-      text: "Bonjour ! Je suis l'assistant de MilChoix Sénégal. Posez-moi une question sur les variétés de mil.",
+      text: "Bonjour ! Je suis l'assistant de MilChoix Sénégal. Posez-moi une question sur les variétés de mil, les zones d'adaptation ou le climat.",
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingId, setStreamingId] = useState<number | null>(null);
+
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const nextIdRef = useRef(1);
+  const stickToBottomRef = useRef(true);
+  // Contexte conversationnel renvoyé par le serveur au tour précédent. Il est
+  // opaque côté client : le serveur le revalide intégralement.
+  const contextRef = useRef<unknown>({});
+
+  const scrollToBottom = useCallback(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, []);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, open, loading]);
+    if (stickToBottomRef.current) scrollToBottom();
+  }, [messages, open, scrollToBottom]);
 
-  async function send(e?: React.FormEvent) {
-    e?.preventDefault();
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  // Annule la requête en cours si le composant est démonté.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const distance = list.scrollHeight - list.scrollTop - list.clientHeight;
+    stickToBottomRef.current = distance < 48;
+  }, []);
+
+  const appendMessage = useCallback((message: Message) => {
+    setMessages((current) => [...current, message].slice(-MAX_MESSAGES));
+  }, []);
+
+  const patchMessage = useCallback((id: number, delta: string) => {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === id ? { ...message, text: message.text + delta } : message
+      )
+    );
+  }, []);
+
+  const removeMessage = useCallback((id: number) => {
+    setMessages((current) => current.filter((message) => message.id !== id));
+  }, []);
+
+  async function send(event?: React.FormEvent) {
+    event?.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
+
+    const userMessage: Message = { id: nextIdRef.current++, role: "user", text };
+    const assistantId = nextIdRef.current++;
+
+    stickToBottomRef.current = true;
     setInput("");
-    setMessages((m) => [...m, { role: "user", text }]);
+    appendMessage(userMessage);
+    appendMessage({ id: assistantId, role: "assistant", text: "" });
     setLoading(true);
+    setStreamingId(assistantId);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const res = await fetch("/api/chatbot", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, language: lang === "auto" ? undefined : lang }),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify({
+          message: text,
+          language: lang === "auto" ? undefined : lang,
+          stream: true,
+          context: contextRef.current,
+        }),
+        signal: controller.signal,
       });
-      const data = await res.json();
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: data.reply ?? "Une erreur est survenue." },
-      ]);
-    } catch {
-      setMessages((m) => [...m, { role: "assistant", text: "Impossible de contacter le serveur." }]);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Une erreur est survenue.");
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      // Repli JSON si le serveur ne diffuse pas d'événements.
+      if (!contentType.includes("text/event-stream") || !res.body) {
+        const data = await res.json();
+        if (data.context) contextRef.current = data.context;
+        patchMessage(assistantId, data.reply ?? "Une erreur est survenue.");
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done = false;
+
+      while (!done) {
+        const read = await reader.read();
+        if (read.done) break;
+
+        buffer += decoder.decode(read.value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+
+        for (const eventChunk of events) {
+          const dataLine = eventChunk
+            .split("\n")
+            .find((line) => line.startsWith("data: "));
+          if (!dataLine) continue;
+
+          let payload: { delta?: string; done?: boolean; context?: unknown };
+          try {
+            payload = JSON.parse(dataLine.slice(6));
+          } catch {
+            continue;
+          }
+
+          if (payload.context) contextRef.current = payload.context;
+          if (payload.delta) patchMessage(assistantId, payload.delta);
+          if (payload.done) done = true;
+        }
+      }
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        removeMessage(assistantId);
+      } else {
+        patchMessage(
+          assistantId,
+          error instanceof Error && error.message !== "Une erreur est survenue."
+            ? `Impossible de contacter le serveur (${error.message}).`
+            : "Impossible de contacter le serveur. Réessayez dans un instant."
+        );
+      }
     } finally {
       setLoading(false);
+      setStreamingId(null);
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  }
+
+  function close() {
+    abortRef.current?.abort();
+    setOpen(false);
   }
 
   return (
     <>
       {open && (
-        <div className="fixed bottom-24 right-4 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl shadow-2xl border border-stone-200 bg-white flex flex-col overflow-hidden">
-          <div className="bg-mil-900 text-white px-4 py-3 flex items-center justify-between">
+        <div className="fixed bottom-24 right-4 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between bg-mil-900 px-4 py-3 text-white">
             <div>
               <p className="font-semibold">Assistant MilChoix</p>
-              <p className="text-xs text-mil-200">Chatbot multilingue</p>
+              <p className="text-xs text-mil-200">Réponses issues des données de la plateforme</p>
             </div>
-            <button onClick={() => setOpen(false)} aria-label="Fermer" className="text-white/80 hover:text-white">
+            <button
+              onClick={close}
+              aria-label="Fermer l'assistant"
+              className="text-white/80 hover:text-white"
+            >
               ✕
             </button>
           </div>
 
-          <div className="px-3 py-2 flex gap-1 border-b border-stone-100">
-            {["auto", "fr", "en", "wo"].map((l) => (
+          <div className="flex gap-1 border-b border-stone-100 px-3 py-2">
+            {["auto", "fr", "en", "wo"].map((value) => (
               <button
-                key={l}
-                onClick={() => setLang(l)}
-                className={`px-2 py-1 rounded text-xs ${
-                  lang === l ? "bg-mil-700 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                key={value}
+                onClick={() => setLang(value)}
+                className={`rounded px-2 py-1 text-xs ${
+                  lang === value
+                    ? "bg-mil-700 text-white"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
-                {l === "auto" ? "Auto" : LANG_LABELS[l]}
+                {value === "auto" ? "Auto" : LANG_LABELS[value]}
               </button>
             ))}
           </div>
 
-          <div ref={listRef} className="flex-1 p-3 space-y-3 overflow-y-auto max-h-80">
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[80%] whitespace-pre-line px-3 py-2 rounded-2xl text-sm ${
-                    m.role === "user"
-                      ? "bg-mil-700 text-white rounded-br-sm"
-                      : "bg-stone-100 text-stone-800 rounded-bl-sm"
-                  }`}
-                >
-                  {m.text}
-                </div>
-              </div>
+          <div
+            ref={listRef}
+            onScroll={handleScroll}
+            role="log"
+            aria-live="polite"
+            aria-label="Conversation"
+            className="max-h-80 flex-1 space-y-3 overflow-y-auto p-3"
+          >
+            {messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                role={message.role}
+                text={message.text}
+                streaming={message.id === streamingId}
+              />
             ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="px-3 py-2 rounded-2xl bg-stone-100 text-stone-500 text-sm">…</div>
-              </div>
-            )}
           </div>
 
-          <form onSubmit={send} className="p-3 border-t border-stone-100 flex gap-2">
+          <form onSubmit={send} className="flex gap-2 border-t border-stone-100 p-3">
             <input
+              ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(event) => setInput(event.target.value)}
               placeholder="Votre question…"
-              className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mil-400"
+              aria-label="Votre question"
+              maxLength={1000}
+              className="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mil-400"
             />
             <button
               type="submit"
-              disabled={loading}
-              className="px-3 py-2 rounded-lg bg-mil-700 text-white text-sm font-semibold disabled:opacity-50"
+              disabled={loading || input.trim().length === 0}
+              className="rounded-lg bg-mil-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Envoyer
             </button>
@@ -119,9 +282,9 @@ export function ChatWidget() {
       )}
 
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((value) => !value)}
         aria-label="Ouvrir l'assistant"
-        className="fixed bottom-6 right-4 z-50 h-14 w-14 rounded-full bg-mil-700 text-white shadow-lg hover:bg-mil-800 transition grid place-items-center"
+        className="fixed bottom-6 right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-mil-700 text-white shadow-lg transition hover:bg-mil-800"
       >
         {open ? (
           <span className="text-xl leading-none">✕</span>
